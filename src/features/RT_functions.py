@@ -71,6 +71,8 @@ def lazy_butter_lp_filter(data, lowcut, fs,dim='time_counter'):
         input_core_dims=[[dim],[],[]],
         output_core_dims=[[dim]],
         dask='parallelized')
+    y.attrs['long_name'] = f'{1/lowcut} days low pass filtered {y.long_name}'
+    y.attrs['description'] = f'{1/lowcut} days low pass filtered {y.description}'
     return y
 
 ##################################################

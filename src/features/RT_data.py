@@ -1,3 +1,28 @@
+import pandas as pd
+import xarray as xr
+
+def load_RT_loc(raw_data_path,RT_mooring_loc):
+    moor_ds=pd.read_csv(raw_data_path/RT_mooring_loc)
+    moor_ds = moor_ds.set_index(['ID']).to_xarray()
+    
+    RT_loc = xr.Dataset()
+    RT_loc['lon_RTWB1'] = moor_ds.sel(ID='RTWB1').lon.values
+    RT_loc['lat_RTWB1'] = moor_ds.sel(ID='RTWB1').lat.values
+    RT_loc['lon_RTWB2'] = moor_ds.sel(ID='RTWB2').lon.values
+    RT_loc['lat_RTWB2'] = moor_ds.sel(ID='RTWB2').lat.values
+    RT_loc['lon_RTWB'] = (RT_loc.lon_RTWB1 + RT_loc.lon_RTWB2)/2
+    RT_loc['lat_RTWB'] = (RT_loc.lat_RTWB1 + RT_loc.lat_RTWB2)/2
+    RT_loc['lon_RTEB'] = moor_ds.sel(ID='RTEB1').lon.values
+    RT_loc['lat_RTEB'] = moor_ds.sel(ID='RTEB1').lat.values
+    RT_loc['lon_RTADCP'] = moor_ds.sel(ID='RTADCP').lon.values
+    RT_loc['lat_RTADCP'] = moor_ds.sel(ID='RTADCP').lat.values
+    RT_loc['lon_RTWS'] = moor_ds.sel(ID='RTWS').lon.values
+    RT_loc['lat_RTWS'] = RT_loc.lat_RTWB
+    RT_loc['lon_RTES'] = moor_ds.sel(ID='RTES').lon.values
+    RT_loc['lat_RTES'] = RT_loc.lat_RTEB
+    
+    return RT_loc
+
 def make_attr(reg_short,reg_long,end_points,data_used,CT_ref,SA_ref,rho_ref=1027.4):
     attrs_Q = {'name':f'Q_{reg_short}',
                    'long_name':f'{reg_short} Volume Transport',

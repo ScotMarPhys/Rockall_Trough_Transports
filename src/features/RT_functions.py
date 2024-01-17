@@ -14,9 +14,10 @@ from pathlib import Path
 from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
 
+
 def ds_rt_swap_vert_dim(ds_RT):
     ds_RT_swap = ds_RT.swap_dims({'PRES':'depth'})
-    ds_RT_swap['depth']=-1*ds_RT_swap.depth
+    ds_RT_swap['depth']=abs(ds_RT_swap.depth)
     ds_RT_swap = ds_RT_swap.interp(depth=ds_RT.PRES.values)
     return ds_RT_swap
 

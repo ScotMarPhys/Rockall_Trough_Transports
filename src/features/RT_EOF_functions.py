@@ -5,6 +5,36 @@ import xarray as xr
 import xeofs as xe
 from matplotlib import pyplot as plt
 
+def add_nan_glider_sections(ds_glider):
+    t1=np.datetime64('2020-09-01')
+    t2=np.datetime64('2021-03-01')
+    t3=np.datetime64('2021-09-01')
+    t4=np.datetime64('2022-03-01')
+    t5=np.datetime64('2022-06-01')
+    t6=np.datetime64('2022-10-01')
+    dummy1=ds_glider.isel(time=0)*np.nan
+    dummy1['time']=t1
+    dummy2=ds_glider.isel(time=0)*np.nan
+    dummy2['time']=t2
+    dummy3=ds_glider.isel(time=0)*np.nan
+    dummy3['time']=t3
+    dummy4=ds_glider.isel(time=0)*np.nan
+    dummy4['time']=t4
+    dummy5=ds_glider.isel(time=0)*np.nan
+    dummy5['time']=t5
+    dummy6=ds_glider.isel(time=0)*np.nan
+    dummy6['time']=t6
+    ds_glider_nan = xr.concat([ds_glider.sel(time=slice(None,t1)),dummy1,
+                              ds_glider.sel(time=slice(t1,t2)),dummy2,
+                              ds_glider.sel(time=slice(t2,t3)),dummy3,
+                              ds_glider.sel(time=slice(t3,t4)),dummy4,
+                              ds_glider.sel(time=slice(t4,t5)),dummy5,
+                              ds_glider.sel(time=slice(t5,t6)),dummy6,
+                              ds_glider.sel(time=slice(t6,None)),
+                              ],
+                             dim='time')
+    return ds_glider_nan
+
 def normalize(x=None, y=None):
     return y / np.linalg.norm(y) / (x.max() - x.min()) ** 0.5
 
@@ -22,6 +52,45 @@ def harmonic_cycle(t, T=1, phi=0):
     """Create harmonic cycles."""
     return np.sin(2 * np.pi / T * (t + phi))
 
+def plot_EOF(model,dim,EOF=True,PC=False):
+    expvar = model.explained_variance()
+    expvar_ratio = model.explained_variance_ratio()
+    scores = model.scores()
+    components = model.components()
+    
+    if PC:
+        axhdl = scores.plot.line(x="time", col="mode", lw=1, ylim=(-0.2, 0.2))
+        for i,ax in enumerate(axhdl.axes.flat):
+            ax.axhline(0,color='k',ls='--')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+    
+    if EOF:
+        fs=14
+        font = {'weight' : 'normal',
+                'size'   : fs}
+        plt.rc('font', **font)
+        fig,axs = plt.subplots(1,components.mode.size,figsize=[12,4],sharey=True)
+        vmin,vmax,levs=-0.02,0.02,21
+        for i,ax in enumerate(axs):
+            im_hdl = components.isel(mode=i).plot(x=dim,ax=ax,add_colorbar=False,
+                        vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r',)
+
+            ax.text(0.95, 0.05,f'Expl. Var.\n {(expvar_ratio * 100).round(0).values[i]:.0f}%',
+                    transform=ax.transAxes, fontsize=fs,
+                     verticalalignment='bottom',horizontalalignment='right')
+            components.isel(mode=i).plot.contour(ax=ax,x=dim,colors='w',linewidths=.5,
+                                                               vmin=vmin,vmax=vmax,levels=levs)
+            ax.grid()
+            if i>0:
+                ax.set_ylabel('')
+        plt.tight_layout()
+        fig.subplots_adjust(right=0.90)
+        cbar_ax = fig.add_axes([0.92, 0.2, 0.02, 0.7])
+        cb =fig.colorbar(im_hdl, cax=cbar_ax)
+    return fig
+
 def EOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x'):
     kwargs = dict(n_modes = n_modes, use_coslat=False,check_nans=True)
     model = xe.models.EOF( **kwargs)
@@ -30,25 +99,7 @@ def EOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x'):
     model.fit(v_anomaly, dim="time")
     
     if plot_out == True:
-        expvar = model.explained_variance()
-        expvar_ratio = model.explained_variance_ratio()
-        scores = model.scores()
-        components = model.components()
-        axhdl = scores.plot.line(x="time", col="mode", lw=1, ylim=(-0.2, 0.2))
-        for i,ax in enumerate(axhdl.axes.flat):
-            ax.axhline(0,color='k',ls='--')
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-        
-        vmin,vmax,levs=-0.02,0.02,21
-        axs = components.plot(x=dim,col='mode',vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
-        for i,ax in enumerate(axs.axes.flat):
-            ax.text(0.95, 0.05,f'Expl. Var.\n {(expvar_ratio * 100).round(0).values[i]:.0f}%',transform=ax.transAxes, fontsize=12,
-                     verticalalignment='bottom',horizontalalignment='right')
-            components.isel(mode=i).plot.contour(ax=ax,x=dim,colors='w',linewidths=.5,
-                                                               vmin=vmin,vmax=vmax,levels=levs)
-        plt.show()
+        fig = plot_EOF(model,dim=dim,EOF=True,PC=True)
     
     return model
 
@@ -176,18 +227,26 @@ def plot_transport(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
     ax.grid()
 
 def plot_error(da_Q_obs,da_Q_rec,mode,axs):
-    for i in range(mode):
-        Q_rec = da_Q_rec.isel(mode=i)
+    
+    if mode==0:
+        Q_rec = da_Q_rec
         result = scipy.stats.linregress(Q_rec,da_Q_obs)
         RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('time'))
-        plt.plot(da_Q_obs,Q_rec,'.',
-                 label=f'{Q_rec.mode.values} EOFs, R={result.rvalue:3.2f}, RMSE={RMSE:3.2f} Sv, STDE={result.stderr:3.2f} ')
-    plt.plot(np.arange(-7,11),np.arange(-7,11),color='k',lw=0.8,ls='--')
-    axs.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.xlabel('Observed transport')
-    plt.ylabel('Reconstructed transport')
-    plt.ylim([-3,11])
-    plt.xlim([-6,10])
+        axs.plot(da_Q_obs,Q_rec,'.',
+             label=f'Fraser et al. (2022), \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
+    else:
+        for i in range(mode):
+            Q_rec = da_Q_rec.isel(mode=i)
+            result = scipy.stats.linregress(Q_rec,da_Q_obs)
+            RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('time'))
+            axs.plot(da_Q_obs,Q_rec,'.',
+                     label=f'{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
+    axs.plot(np.arange(-7,11),np.arange(-7,11),color='k',lw=0.8,ls='--')
+    axs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2))
+    axs.set_xlabel('Observed transport')
+    axs.set_ylabel('Reconstructed transport')
+    axs.set_ylim([-3,11])
+    axs.set_xlim([-6,10])
     axs.set_aspect('equal', adjustable='box')
     axs.grid()
     axs.axvline(0,color='k',lw=0.8,ls='--')

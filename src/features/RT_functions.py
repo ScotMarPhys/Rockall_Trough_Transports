@@ -310,3 +310,35 @@ def calc_SA_CT_sigma0(ds):
                   dask = 'parallelized',output_dtypes=[float,])
     ds.sigma0.attrs = sigma0_attrs
     return ds
+
+def calc_fluxes(ds):
+    SA_ref = 35.34         # Reference Absolute Salinity (g/kg), for freshwater flux calc
+    CT_ref = 7.07          # Reference Conservative Temperature (C), for heat flux calc
+    rhoCp = 4.1e6         # Constant: Reference density times specific heat capacity (J m^-3 C^-1)   
+    rho0 = 1027.4            # Reference density      
+    
+    qh = rhoCp*ds.q*(ds.CT - CT_ref)
+    qf = -1*ds.q*(ds.SA - SA_ref)/SA_ref
+    qS = ds.q*ds.SA/rho0
+    
+    
+    qh_attrs={'name':'qh',
+            'long_name':'heat transport per grid cell',
+            'units':'PW',
+            'description':f'Heat transport per grid cell referenced '\
+            f'to temperature of {CT_ref}degC'}
+    qf_attrs = {'name': 'qf',
+                'long_name': 'Freshwater transport per grid cell',
+                'units':'Sv',
+                'description':f'Freshwater transport per grid cell referenced '\
+                f'to salinity of {CT_ref} g/kg'}
+    qS_attrs = {'name': 'qS',
+                'long_name': 'Salt transport per grid cell',
+                'units':'Sv',
+                'description':f'Salt transport per grid cell referenced '\
+                f'to density time specific heat capacity of of {rho0}kg m^-3'}
+    
+    qh.attrs =qh_attrs
+    qf.attrs =qf_attrs
+    qS.attrs =qS_attrs
+    return qh, qf, qS

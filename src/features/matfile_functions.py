@@ -49,8 +49,8 @@ def load_RTADCP_mat(RTADCP_data_path,RTADCP_fn):
 
     ds_adcp = xr.Dataset(
             data_vars=dict(
-                vcur=(['pres','time'],df_RTADCP['vfii_linear']*1e-2),
-                ucur=(['pres','time'],df_RTADCP['ufii_linear']*1e-2)),
+                vcur=(['pres','time'],df_RTADCP['vfii']*1e-2),
+                ucur=(['pres','time'],df_RTADCP['ufii']*1e-2)),
             coords=dict(
                 time=adcp_tgrid,
                 pres=df_RTADCP['pgrid'].squeeze(),

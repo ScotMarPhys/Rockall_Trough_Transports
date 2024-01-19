@@ -15,10 +15,10 @@ from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
 
 
-def ds_rt_swap_vert_dim(ds_RT):
-    ds_RT_swap = ds_RT.swap_dims({'PRES':'depth'})
+def ds_rt_swap_vert_dim(ds_RT,dim='PRES'):
+    ds_RT_swap = ds_RT.swap_dims({dim:'depth'})
     ds_RT_swap['depth']=abs(ds_RT_swap.depth)
-    ds_RT_swap = ds_RT_swap.interp(depth=ds_RT.PRES.values)
+    ds_RT_swap = ds_RT_swap.interp(depth=ds_RT[dim].values)
     return ds_RT_swap
 
 def gsw_geo_strf_dyn_height(SA,CT,P,P_ref):
@@ -72,8 +72,14 @@ def lazy_butter_lp_filter(data, lowcut, fs,dim='time_counter'):
         input_core_dims=[[dim],[],[]],
         output_core_dims=[[dim]],
         dask='parallelized')
-    y.attrs['long_name'] = f'{1/lowcut} days low pass filtered {y.long_name}'
-    y.attrs['description'] = f'{1/lowcut} days low pass filtered {y.description}'
+    if 'long_name' in y.attrs:
+        y.attrs['long_name'] = f'{1/lowcut} days low pass filtered {y.long_name}'
+    else:
+        y.attrs['long_name'] = f'{1/lowcut} days low pass filtered'
+    if 'description' in y.attrs:
+        y.attrs['description'] = f'{1/lowcut} days low pass filtered {y.description}'
+    else:
+        y.attrs['description'] = f'{1/lowcut} days low pass filtered'
     return y
 
 ##################################################

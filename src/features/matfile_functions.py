@@ -1,6 +1,7 @@
 import pandas as pd
 import mat73
 import xarray as xr
+import scipy
 
 def mt2dt(matlab_datenum):
         return pd.to_datetime(matlab_datenum-719529, unit='D')
@@ -40,3 +41,33 @@ def load_glider_mat(glider_data_path,glider_fn):
     ds_glider.x.attrs= {'units':'m',
                         'long_name':'Distance from RTEB1, positive towards east'}
     return ds_glider
+
+def load_RTADCP_mat(RTADCP_data_path,RTADCP_fn):
+    df_RTADCP = scipy.io.loadmat((RTADCP_data_path/RTADCP_fn))
+
+    adcp_tgrid = mt2dt(df_RTADCP['dnumi'].squeeze())
+
+    ds_adcp = xr.Dataset(
+            data_vars=dict(
+                vcur=(['pres','time'],df_RTADCP['vfii_linear']*1e-2),
+                ucur=(['pres','time'],df_RTADCP['ufii_linear']*1e-2)),
+            coords=dict(
+                time=adcp_tgrid,
+                pres=df_RTADCP['pgrid'].squeeze(),
+                lon=('loc',df_RTADCP['lon'][0]),
+                lat=('loc',df_RTADCP['lat'][0])),
+            attrs=dict(
+                description='RTADCP data processed by Houper et al. (2020), doi:10.1029/2020JC016403 ')
+            )
+   
+    ds_adcp.vcur.attrs = {'name':'vcur',
+                            'long_name':'Meridional Velocities',
+                            'units':'m/s'}
+    ds_adcp.lat.attrs = {'units':'degN',
+                           'long_name':'Latitude'}
+    ds_adcp.lon.attrs = {'units':'degE',
+                           'long_name':'Longitude'}
+    ds_adcp.pres.attrs= {'units':'dbar',
+                            'long_name':'Pressure'}
+    
+    return ds_adcp

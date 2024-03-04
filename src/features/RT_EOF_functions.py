@@ -223,7 +223,7 @@ def plot_transport(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
         Q_rec = Q_rec.mean('mode') 
     Q_rec.sel(time=slice(ds_glider.time.min().values,ds_glider.time.max().values)
               ).plot.line('-',label=f'EOF {mode_no} full',color='C2',ax=ax)
-    ax.legend()
+    ax.legend(loc='upper right', bbox_to_anchor=(1.1, 1.1))
     ax.grid()
 
 def plot_error(da_Q_obs,da_Q_rec,mode,axs):

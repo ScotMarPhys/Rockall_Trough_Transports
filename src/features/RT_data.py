@@ -4,6 +4,8 @@ from pathlib import Path
 import copernicusmarine as cm
 import gsw
 from pandas.tseries.offsets import DateOffset
+import sys; sys.path.append(r'../../')
+import src.set_paths as sps
 
 def change_lon(ds,lon):
     lon_attrs = ds[lon].attrs
@@ -18,6 +20,14 @@ def mm_mid_month(ds,tstr):
     ds1 = pd.date_range(start=reference_date, periods=ds.sizes[tstr], freq='MS')+DateOffset(months=offset)
     ds2 = pd.date_range(start=reference_date, periods=ds.sizes[tstr], freq='M')+DateOffset(months=offset)
     return ds1+(ds2-ds1)/2-pd.to_timedelta(.5, unit='d')
+    
+def load_cruise_list():
+    df_cruises = pd.read_csv((sps.RT_data_path/'RT_mooring_cruises.csv'))
+    df_cruises['date start']= pd.to_datetime(df_cruises['date start'],format='%d/%m/%Y')
+    ds_cruises = df_cruises['cruise_id'].to_xarray()
+    ds_cruises.coords['TIME']=('index',df_cruises['date start'])
+    ds_cruises = ds_cruises.swap_dims({'index':'TIME'}).drop_vars('index')
+    return ds_cruises
 
 
 def load_RT_loc(raw_data_path,RT_mooring_loc):

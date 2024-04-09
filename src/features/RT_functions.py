@@ -14,6 +14,82 @@ from pathlib import Path
 from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
 
+def ddspike(da,std_win,stddy_tol,nloop,dim_x,dim_y,graphics=True):
+    mda = da.median(dim_x)
+    sda = da.std(dim_x)
+    ytol= mda + std_win*sda
+
+    mask_ytol = (np.abs(da.fillna(0))<=ytol)
+    spikes_ytol = (np.abs(da.fillna(0))>ytol)
+    
+    if graphics:
+        fig,axs = plt.subplots(nloop+1,1,sharey=True,figsize=[10,(nloop+1)/2])
+        ax = axs[0]
+        spikes_ytol.sum(dim_y).plot(ax=ax,x=dim_x)
+        ax.set_ylabel('')
+
+    print(f'{spikes_ytol.sum().values} exceeds max threshold')
+
+    da = da.where(mask_ytol)
+
+
+    for i in range(nloop):
+        print(f'Loop number {i+1}')
+        dda_p1=da.fillna(0).shift({dim_x:1},fill_value=0)-da.fillna(0)
+        dda_m1=da.fillna(0)-da.fillna(0).shift({dim_x:-1},fill_value=0)
+
+        dda_p1_std = dda_p1.std(dim_x)
+        dda_m1_std = dda_m1.std(dim_x)
+
+        m_dda_p1 = (np.abs(dda_p1)/dda_p1_std>=stddy_tol)
+        m_dda_m1 = (np.abs(dda_m1)/dda_m1_std>=stddy_tol)
+
+        m_dda = (m_dda_p1.fillna(0)+m_dda_m1.fillna(0))==0
+
+        s_dda = (m_dda_p1.fillna(0)+m_dda_m1.fillna(0))!=0
+        if graphics:
+            ax = axs[i+1]
+            s_dda.sum(dim_y).plot(ax=ax,x=dim_x)
+            ax.set_ylabel('')
+        print(f'{s_dda.sum().values} spikes found')
+        da = da.where(m_dda)
+
+    return da
+        
+def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics):
+    
+    if moor=='EB1':
+        var_i = var.interpolate_na(
+        dim='PRES',
+        method="linear",
+        )
+        tlim = var_i.TIME.sel(TIME='2020-10-09T12:00:00',method='nearest')
+        mask_2 = var_i.where((var_i.TIME>tlim)).notnull()
+        mask_2 = mask_2 + var_i.where((var_i.TIME>tlim)).shift(PRES=-12).notnull()
+
+    elif moor=='WB2':
+        mask = (var.PRES<1800)&(var.PRES>1020)
+    
+    var_i = var.interpolate_na(
+        dim='PRES',
+        method="linear",
+        fill_value="extrapolate",
+    )
+    
+    if moor=='EB1':
+        mask_1 = var_i.where((var_i.PRES<=1780)&(var.TIME<=tlim)).notnull()
+        mask = mask_1+mask_2
+    elif moor=='WB1':
+        mask = var_i.where((var_i.PRES<=1580)).notnull()
+        
+    var_i = var_i.where(mask)
+    mask = var_i.notnull()
+    var_i = ddspike(var_i,std_win,stddy_tol,nloop,dim_x,dim_y,graphics)
+    var_i = var_i.interpolate_na(
+                dim='TIME',
+                method="linear",
+            ).where(mask)
+    return var_i
 
 def ds_rt_swap_vert_dim(ds_RT,dim='PRES'):
     ds_RT_swap = ds_RT.swap_dims({dim:'depth'})
@@ -84,14 +160,14 @@ def lazy_butter_lp_filter(data, lowcut, fs,dim='time_counter'):
 
 ##################################################
 def xcorr_norm(x,y,dim):
-        """
-        Perform Cross-Correlation on x and y
-        x    : 1st signal
-        y    : 2nd signal
+#         """
+#         Perform Cross-Correlation on x and y
+#         x    : 1st signal
+#         y    : 2nd signal
 
-        returns
-        corr : coefficients of correlation
-        """
+#         returns
+#         corr : coefficients of correlation
+#         """
         # First normalise the variable
         xnorm = (x - x.mean(dim)) / (x.std(dim)*len(x));
         ynorm = (y - y.mean(dim)) / (y.std(dim))
@@ -131,7 +207,8 @@ def decorrelation(x,y,dim,doplot,precision=2):
     # % dcl is the decorrelation length scale in the units of x
     # % dof is the number of degrees of freedom in x. Calculated by length(x) /
     # % dcl.
-    # % Stuart Cunningham, July 2017 
+    # % Stuart Cunningham, July 2017
+    # Adapted for python xarray, Kristin Burmeister, 2023
 
     C,lags = xcorr_norm(x,y,dim) # compute normalised correlation coefficient
 

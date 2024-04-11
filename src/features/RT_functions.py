@@ -84,11 +84,11 @@ def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics
         
     var_i = var_i.where(mask)
     mask = var_i.notnull()
-    var_i = ddspike(var_i,std_win,stddy_tol,nloop,dim_x,dim_y,graphics)
-    var_i = var_i.interpolate_na(
-                dim='TIME',
-                method="linear",
-            ).where(mask)
+    # var_i = ddspike(var_i,std_win,stddy_tol,nloop,dim_x,dim_y,graphics)
+    # var_i = var_i.interpolate_na(
+    #             dim='TIME',
+    #             method="linear",
+    #         ).where(mask)
     return var_i
 
 def ds_rt_swap_vert_dim(ds_RT,dim='PRES'):

@@ -11,8 +11,32 @@ import scipy.signal as signal
 import palettable.colorbrewer as cb
 import xarray as xr
 from pathlib import Path
+from matplotlib import pyplot as plt
 from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+
+def normalise_and_predict(x,y,dim):
+    # first normalise the variable x
+    xnorm = (x - x.mean(dim)) / (x.std(dim));
+
+    # then fit to y
+    y_pred = (xnorm * y.std(dim)) + y.mean(dim)
+    # y_pred = (xnorm) * (y.std(dim))
+    return y_pred
+
+def lin_fit_quick(x,y):
+    x = x.values.reshape(-1, 1)
+    y = y.values.reshape(-1, 1)
+    model = LinearRegression().fit(x,y)
+    r_sq = r2_score(x, y)
+    error = mean_squared_error(x,y)
+    print(f"coefficient of correlation: {np.sqrt(r_sq)}")
+    print(f"mean square errpr: {error}")
+    print(f"intercept: {model.intercept_}")
+    print(f"slope: {model.coef_}")
+    return model
 
 def ddspike(da,std_win,stddy_tol,nloop,dim_x,dim_y,graphics=True):
     mda = da.median(dim_x)
@@ -55,6 +79,137 @@ def ddspike(da,std_win,stddy_tol,nloop,dim_x,dim_y,graphics=True):
         da = da.where(m_dda)
 
     return da
+
+def prep_data_for_gab_filling(da,px,py,day_cutoff):
+    px_str = f'p{px}m'
+    py_str = f'p{py}m'
+    px_lp_str = f'p{px}m_lp'
+    py_lp_str = f'p{py}m_lp'
+    
+    x = da.sel(PRES=px,method = 'nearest')
+    y = da.sel(PRES=py,method = 'nearest')
+
+    x = x.where(y.notnull(),drop=True)
+    y = y.where(y.notnull(),drop=True)
+
+    v_merge = xr.merge([x.rename(px_str),
+          y.rename(py_str)])
+    v_merge['v_diff'] = v_merge[px_str]-v_merge[py_str]
+    v_merge['month'] = v_merge.TIME.dt.month
+    
+    #low pass filter
+    dt = 0.5 # twice per day, time step of sampling
+    fs = 1/dt # sample rate (1/day)
+    lowcut = 1/day_cutoff # cut off frequency 1/day_cutoff
+    v_merge[px_lp_str] = rtf.lazy_butter_lp_filter(v_merge[px_str], lowcut, fs,dim='TIME')
+    v_merge[py_lp_str] = rtf.lazy_butter_lp_filter(v_merge[py_str], lowcut, fs,dim='TIME')
+    return v_merge
+
+def plot_figure_gap(v_merge,y_pred,py_str,y_pred_lp,py_lp_str,period=[None,None]):
+        fig,axs = plt.subplots(3,1,figsize=[15,8])
+        ax = axs[0]
+        v_merge[py_str].sel(TIME=slice(*period)).plot(label=py_str,lw=1,ax=ax,color='C1')
+        v_merge[y_pred].sel(TIME=slice(*period)).plot(label=f'pred {py_str}',lw=0.58,ax=ax,color='k')
+
+        ax = axs[1]
+        v_merge[py_lp_str].sel(TIME=slice(*period)).plot(
+            label=f'{py_str} {day_cutoff:.0f}d-lp',lw=1,ax=ax,color='C1')
+        v_merge[y_pred_lp].sel(TIME=slice(*period)).plot(
+            label=f'pred {py_str} {day_cutoff:.0f}d-lp',lw=0.58,ax=ax,color='k')
+        
+        ax = axs[2]
+        (v_merge[py_str]-v_merge[y_pred]).sel(TIME=slice(*period)).plot.line(
+            'x',label=f'residuals',lw=0.58,ax=ax,color='C0')
+        (v_merge[py_lp_str]-v_merge[y_pred_lp]).sel(TIME=slice(*period)).plot.line(
+            '+',label=f'residuals lp',lw=0.58,ax=ax,color='C2')
+
+        for ax in axs.flat:
+            ax.legend()
+            ax.set_title('')
+            ax.grid()
+
+def print_stats(y,y_pred):
+    error = mean_squared_error(y,y_pred)
+    r_sq = r2_score(y,y_pred)
+    
+    print(f"Mean square error: {error}")
+    print(f"coefficient of correlation: {np.sqrt(r_sq)}")
+    print(f"Mean y {y.mean().values}, mean y pred {y_pred.mean().values}")
+    print(f"Std y {y.std().values}, std y pred {y_pred.std().values}")
+
+def lin_fit_depth(da,px,py,day_cutoff,graphics=True,std_scale=True):
+    v_merge = prep_data_for_gab_filling(da, px, py,day_cutoff)
+    
+    px_str = f'p{px}m'
+    py_str = f'p{py}m'
+    px_lp_str = f'p{px}m_lp'
+    py_lp_str = f'p{py}m_lp'
+    
+    x = v_merge[px_str]
+    y = v_merge[py_str]
+    model = lin_fit_quick(x,y)
+    v_merge['y_pred'] = model.intercept_.item() + model.coef_.item()*x
+    
+    x_lp = v_merge[px_lp_str]
+    y_lp = v_merge[py_lp_str]
+    model_lp = lin_fit_quick(x_lp,y_lp)
+    v_merge['y_pred_lp'] = model_lp.intercept_.item() + model_lp.coef_.item()*x_lp
+    
+    print('Lin regression orig')
+    print_stats(y,v_merge['y_pred'])
+    print('Lin regression lp')
+    print_stats(y_lp,v_merge['y_pred_lp'])
+     
+    
+    if std_scale:
+        v_merge['y_scaled'] = normalise_and_predict(v_merge[px_str],v_merge[py_str],'TIME')
+        v_merge['y_scaled_lp'] = normalise_and_predict(v_merge[px_lp_str],v_merge[py_lp_str],'TIME')
+    
+        print(f"Scaling orig")
+        print_stats(v_merge[py_str],v_merge['y_scaled'])
+        print(f"Scaling lp")
+        print_stats(v_merge[py_lp_str],v_merge['y_scaled_lp'])
+    
+    if graphics:
+        plot_figure_gap(v_merge,'y_pred',py_str,'y_pred_lp',py_lp_str,period=[None,None])
+        if std_scale:
+            plot_figure_gap(v_merge,'y_scaled',py_str,'y_scaled_lp',py_lp_str,period=[None,None]) 
+            
+    return v_merge
+
+def plot_correlation_stacked(ds_RT_stacked,px,py,period):
+    x = ds_RT_stacked.sel(TIME=slice(*period)).VS_EAST_1.sel(ZS_EAST_1_UV=px,method='nearest')
+    y = ds_RT_stacked.sel(TIME=slice(*period)).VS_EAST_1.sel(ZS_EAST_1_UV=py,method='nearest')
+
+    x = x.where(y.notnull(),drop=True)
+    y = y.where(y.notnull(),drop=True)
+    y = y.where(x.notnull(),drop=True)
+    x = x.where(x.notnull(),drop=True)
+
+    #low pass filter
+    # dt = 0.5 # twice per day, time step of sampling
+    # fs = 1/dt # sample rate (1/day)
+    # lowcut = 1/day_cutoff # cut off frequency 1/day_cutoff
+    # x = rtf.lazy_butter_lp_filter(x, lowcut, fs,dim='TIME')
+    # y = rtf.lazy_butter_lp_filter(y, lowcut, fs,dim='TIME')
+
+    y_pred = normalise_and_predict(x,y,'TIME')
+
+
+    x.sel(TIME=slice(*period)).plot(figsize=(15,4),label=f'x={px}')
+    y.sel(TIME=slice(*period)).plot(label=f'y={py}')
+    y_pred.sel(TIME=slice(*period)).plot(label=f'y pred',color='k',ls='--')
+    plt.legend()
+
+    print(x.mean().values,x.std().values)
+    print(y.mean().values,y.std().values)
+    print(y_pred.mean().values,y_pred.std().values)
+    print(f'x,y: {xr.corr(x,y).values}')
+    print(f'RME x, y = {np.sqrt((y-x)**2).mean().values}')
+    print(f'y,y_pred: {xr.corr(y,y_pred).values}')
+    print(f'RME y, y_pred = {np.sqrt((y-y_pred)**2).mean().values}')
+
+
         
 def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics):
     
@@ -84,11 +239,11 @@ def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics
         
     var_i = var_i.where(mask)
     mask = var_i.notnull()
-    # var_i = ddspike(var_i,std_win,stddy_tol,nloop,dim_x,dim_y,graphics)
-    # var_i = var_i.interpolate_na(
-    #             dim='TIME',
-    #             method="linear",
-    #         ).where(mask)
+    var_i = ddspike(var_i,std_win,stddy_tol,nloop,dim_x,dim_y,graphics)
+    var_i = var_i.interpolate_na(
+                dim='TIME',
+                method="linear",
+            ).where(mask)
     return var_i
 
 def ds_rt_swap_vert_dim(ds_RT,dim='PRES'):

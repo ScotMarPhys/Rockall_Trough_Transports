@@ -6,12 +6,12 @@ import xeofs as xe
 from matplotlib import pyplot as plt
 
 def add_nan_glider_sections(ds_glider):
-    t1=np.datetime64('2020-09-01')
-    t2=np.datetime64('2021-03-01')
-    t3=np.datetime64('2021-09-01')
-    t4=np.datetime64('2022-03-01')
-    t5=np.datetime64('2022-06-01')
-    t6=np.datetime64('2022-10-01')
+    t1=np.datetime64('2020-09-01', 'ns')
+    t2=np.datetime64('2021-03-01', 'ns')
+    t3=np.datetime64('2021-09-01', 'ns')
+    t4=np.datetime64('2022-03-01', 'ns')
+    t5=np.datetime64('2022-06-01', 'ns')
+    t6=np.datetime64('2022-10-01', 'ns')
     dummy1=ds_glider.isel(time=0)*np.nan
     dummy1['time']=t1
     dummy2=ds_glider.isel(time=0)*np.nan

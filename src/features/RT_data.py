@@ -6,6 +6,28 @@ import gsw
 from pandas.tseries.offsets import DateOffset
 import sys; sys.path.append(r'../../')
 import src.set_paths as sps
+import cftime
+import datetime
+
+def load_eap():
+    ds_EAP = xr.open_dataset((sps.EAP_path/sps.EAP_fn),decode_times=False)
+    datesin = cftime.num2date(ds_EAP.T, ds_EAP.T.units, '360_day')
+    datesout = [datetime.datetime(vv.year,vv.month,vv.day) for vv in datesin]
+    ds_EAP['T']=datesout
+    return ds_EAP
+def load_nao():
+    df_NAO = pd.read_csv(sps.NAO_path/sps.NAO_fn)
+
+    date = pd.to_datetime(df_NAO.iloc[:, [0,1,2]])
+
+    ds_NAO = xr.Dataset(
+        data_vars=dict(
+            NAO_index=(['time'],df_NAO['index'])),
+        coords=dict(
+            time=date),
+        attrs=dict(
+            description='NOA index after Barnston_1987'))
+    return ds_NAO
 
 def change_lon(ds,lon):
     lon_attrs = ds[lon].attrs

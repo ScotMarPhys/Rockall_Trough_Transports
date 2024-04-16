@@ -9,12 +9,22 @@ import src.set_paths as sps
 import cftime
 import datetime
 
+def load_glorys():
+    ds_GLORYS_re = xr.open_mfdataset(sps.GLORYS_fn_re)
+    ds_GLORYS_an = xr.open_mfdataset(sps.GLORYS_fn_an)
+    ds_GLORYS_an.coords['latitude'] = ds_GLORYS_re.latitude # lat and lon slightly different values, i.e. manually merge
+    ds_GLORYS_an.coords['longitude'] = ds_GLORYS_re.longitude
+    ds_GLORYS_an.coords['depth'] = ds_GLORYS_re.depth
+    ds_GLORYS = xr.concat([ds_GLORYS_re,ds_GLORYS_an],'time')
+    return ds_GLORYS
+
 def load_eap():
     ds_EAP = xr.open_dataset((sps.EAP_path/sps.EAP_fn),decode_times=False)
     datesin = cftime.num2date(ds_EAP.T, ds_EAP.T.units, '360_day')
     datesout = [datetime.datetime(vv.year,vv.month,vv.day) for vv in datesin]
     ds_EAP['T']=datesout
     return ds_EAP
+
 def load_nao():
     df_NAO = pd.read_csv(sps.NAO_path/sps.NAO_fn)
 
@@ -52,7 +62,7 @@ def load_cruise_list():
     return ds_cruises
 
 
-def load_RT_loc(raw_data_path,RT_mooring_loc):
+def load_RT_loc(raw_data_path=sps.raw_data_dir,RT_mooring_loc=sps.RT_loc_fn):
     moor_ds=pd.read_csv(raw_data_path/RT_mooring_loc)
     moor_ds = moor_ds.set_index(['ID']).to_xarray()
     

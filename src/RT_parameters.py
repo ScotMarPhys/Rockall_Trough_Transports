@@ -11,3 +11,8 @@ CT_ref = 7.07          # Reference Conservative Temperature (C), for heat flux c
 rhoCp = 4.1e6         # Constant: Reference density times specific heat capacity (J m^-3 C^-1)   
 rho0 = 1027            # Reference density          
 Omega = 7.2921e-5     # Earth's rotation
+
+# Praemble for despike time series after vertical extrapolation to surface - velocity
+stddy_tol  = 10; # set max velocities range (diff velocity pm stddy_tol)
+std_win    = 3.5; # 3.5 * std of the time series (median pm std_win)
+nloop    = 5; # max number of despiking repetitions

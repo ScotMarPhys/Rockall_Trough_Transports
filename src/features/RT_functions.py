@@ -52,13 +52,12 @@ def ddspike(da,std_win,stddy_tol,nloop,dim_x,dim_y,graphics=True):
         spikes_ytol.sum(dim_y).plot(ax=ax,x=dim_x)
         ax.set_ylabel('')
 
-    print(f'{spikes_ytol.sum().values} exceeds max threshold')
+        print(f'{spikes_ytol.sum().values} exceeds max threshold')
 
     da = da.where(mask_ytol)
 
 
     for i in range(nloop):
-        print(f'Loop number {i+1}')
         dda_p1=da.fillna(0).shift({dim_x:1},fill_value=0)-da.fillna(0)
         dda_m1=da.fillna(0)-da.fillna(0).shift({dim_x:-1},fill_value=0)
 
@@ -75,7 +74,10 @@ def ddspike(da,std_win,stddy_tol,nloop,dim_x,dim_y,graphics=True):
             ax = axs[i+1]
             s_dda.sum(dim_y).plot(ax=ax,x=dim_x)
             ax.set_ylabel('')
-        print(f'{s_dda.sum().values} spikes found')
+            
+            
+            print(f'Loop number {i+1}')
+            print(f'{s_dda.sum().values} spikes found')
         da = da.where(m_dda)
 
     return da
@@ -245,6 +247,49 @@ def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics
                 method="linear",
             ).where(mask)
     return var_i
+
+def repeat_upper_values(var):
+    mask = var.notnull()
+    mask = mask + var.shift(PRES=-10).notnull()
+    var = var.interpolate_na(
+        dim='PRES',
+        method="nearest",
+        fill_value="extrapolate",
+    ).where(mask)
+    return var
+
+def extr_moored_RT_timeseries(ds_RT,dim_x,dim_y,graphics=True):
+    ds_RT['V_EAST'] = rtf.CM_linear_upper_values(ds_RT.V_EAST,'EB1',
+                         rtp.std_win,rtp.stddy_tol,rtp.nloop,dim_x,dim_y,graphics)
+    ds_RT['U_EAST'] = rtf.CM_linear_upper_values(ds_RT.U_EAST,'EB1',
+                             rtp.std_win,rtp.stddy_tol,rtp.nloop,dim_x,dim_y,graphics)
+    ds_RT['V_WEST_1'] = rtf.CM_linear_upper_values(ds_RT.V_WEST_1,'WB1',
+                             rtp.std_win,rtp.stddy_tol,rtp.nloop,dim_x,dim_y,graphics)
+    ds_RT['U_WEST_1'] = rtf.CM_linear_upper_values(ds_RT.U_WEST_1,'WB1',
+                             rtp.std_win,rtp.stddy_tol,rtp.nloop,dim_x,dim_y,graphics)
+
+    # repeat upper values of hydrography
+    ds_RT['TG_EAST'] = rtf.repeat_upper_values(ds_RT['TG_EAST'])
+    ds_RT['SG_EAST'] = rtf.repeat_upper_values(ds_RT['SG_EAST'])
+    ds_RT['TG_WEST'] = rtf.repeat_upper_values(ds_RT['TG_WEST'])
+    ds_RT['SG_WEST'] = rtf.repeat_upper_values(ds_RT['SG_WEST'])
+    return ds_RT
+
+def merge_RT_WB1_2(ds_RT,mean=False):
+    ds_RT['v_RTWB'] = ds_RT.V_WEST_2.where(ds_RT.V_WEST_1.isnull())
+    ds_RT['v_mask'] = (ds_RT.v_RTWB.notnull()+ds_RT.V_WEST_1.notnull())
+    
+    if mean:
+        ds_RT['v_RTWB'] = ((ds_RT.V_WEST_1.where(
+        ds_RT.V_WEST_2.isnull()).fillna(0
+        )+ds_RT.V_WEST_2.fillna(0
+        )+ds_RT.V_WEST_2.where(
+        ds_RT.V_WEST_1.isnull()).fillna(0
+        )+ds_RT.V_WEST_1.fillna(0))/2).where(ds_RT.v_mask==1)
+    else:
+        ds_RT['v_RTWB'] = (ds_RT.v_RTWB.fillna(0)+ds_RT.V_WEST_1.fillna(0)).where(
+            ds_RT.v_mask==1)
+    return ds_RT
 
 def ds_rt_swap_vert_dim(ds_RT,dim='PRES'):
     ds_RT_swap = ds_RT.swap_dims({dim:'depth'})

@@ -17,6 +17,10 @@ from xhistogram.xarray import histogram as xhist
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 
+import sys; sys.path.append(r'../')
+import src.RT_parameters as rtp
+import src.set_paths as sps
+
 def normalise_and_predict(x,y,dim):
     # first normalise the variable x
     xnorm = (x - x.mean(dim)) / (x.std(dim));
@@ -215,17 +219,15 @@ def plot_correlation_stacked(ds_RT_stacked,px,py,period):
         
 def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics):
     
-    if moor=='EB1':
-        var_i = var.interpolate_na(
-        dim='PRES',
-        method="linear",
-        )
-        tlim = var_i.TIME.sel(TIME='2020-10-09T12:00:00',method='nearest')
-        mask_2 = var_i.where((var_i.TIME>tlim)).notnull()
-        mask_2 = mask_2 + var_i.where((var_i.TIME>tlim)).shift(PRES=-12).notnull()
+    # if moor=='EB1':
+    #     var_i = var.interpolate_na(
+    #     dim='PRES',
+    #     method="linear",
+    #     )
+    #     tlim = var_i.TIME.sel(TIME='2020-10-09T12:00:00',method='nearest')
+    #     mask_2 = var_i.where((var_i.TIME>tlim)).notnull()
+    #     mask_2 = mask_2 + var_i.where((var_i.TIME>tlim)).shift(PRES=-12).notnull()
 
-    elif moor=='WB2':
-        mask = (var.PRES<1800)&(var.PRES>1020)
     
     var_i = var.interpolate_na(
         dim='PRES',
@@ -234,8 +236,9 @@ def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics
     )
     
     if moor=='EB1':
-        mask_1 = var_i.where((var_i.PRES<=1780)&(var.TIME<=tlim)).notnull()
-        mask = mask_1+mask_2
+        mask = var_i.where(var_i.PRES<=1800).notnull()
+    elif moor=='WB2':
+        mask = (var.PRES<1800)&(var.PRES>1020)
     elif moor=='WB1':
         mask = var_i.where((var_i.PRES<=1580)).notnull()
         
@@ -259,20 +262,20 @@ def repeat_upper_values(var):
     return var
 
 def extr_moored_RT_timeseries(ds_RT,dim_x,dim_y,graphics=True):
-    ds_RT['V_EAST'] = rtf.CM_linear_upper_values(ds_RT.V_EAST,'EB1',
+    ds_RT['V_EAST'] = CM_linear_upper_values(ds_RT.V_EAST,'EB1',
                          rtp.std_win,rtp.stddy_tol,rtp.nloop,dim_x,dim_y,graphics)
-    ds_RT['U_EAST'] = rtf.CM_linear_upper_values(ds_RT.U_EAST,'EB1',
+    ds_RT['U_EAST'] = CM_linear_upper_values(ds_RT.U_EAST,'EB1',
                              rtp.std_win,rtp.stddy_tol,rtp.nloop,dim_x,dim_y,graphics)
-    ds_RT['V_WEST_1'] = rtf.CM_linear_upper_values(ds_RT.V_WEST_1,'WB1',
+    ds_RT['V_WEST_1'] = CM_linear_upper_values(ds_RT.V_WEST_1,'WB1',
                              rtp.std_win,rtp.stddy_tol,rtp.nloop,dim_x,dim_y,graphics)
-    ds_RT['U_WEST_1'] = rtf.CM_linear_upper_values(ds_RT.U_WEST_1,'WB1',
+    ds_RT['U_WEST_1'] = CM_linear_upper_values(ds_RT.U_WEST_1,'WB1',
                              rtp.std_win,rtp.stddy_tol,rtp.nloop,dim_x,dim_y,graphics)
 
     # repeat upper values of hydrography
-    ds_RT['TG_EAST'] = rtf.repeat_upper_values(ds_RT['TG_EAST'])
-    ds_RT['SG_EAST'] = rtf.repeat_upper_values(ds_RT['SG_EAST'])
-    ds_RT['TG_WEST'] = rtf.repeat_upper_values(ds_RT['TG_WEST'])
-    ds_RT['SG_WEST'] = rtf.repeat_upper_values(ds_RT['SG_WEST'])
+    ds_RT['TG_EAST'] = repeat_upper_values(ds_RT['TG_EAST'])
+    ds_RT['SG_EAST'] = repeat_upper_values(ds_RT['SG_EAST'])
+    ds_RT['TG_WEST'] = repeat_upper_values(ds_RT['TG_WEST'])
+    ds_RT['SG_WEST'] = repeat_upper_values(ds_RT['SG_WEST'])
     return ds_RT
 
 def merge_RT_WB1_2(ds_RT,mean=False):

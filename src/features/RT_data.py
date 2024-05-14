@@ -4,10 +4,13 @@ from pathlib import Path
 import copernicusmarine as cm
 import gsw
 from pandas.tseries.offsets import DateOffset
-import sys; sys.path.append(r'../../')
-import src.set_paths as sps
 import cftime
 import datetime
+
+#local functions
+import sys; sys.path.append(r'../../')
+import src.set_paths as sps
+import src.features.matfile_functions as matlab_fct
 
 def load_glorys():
     ds_GLORYS_re = xr.open_mfdataset(sps.GLORYS_fn_re)

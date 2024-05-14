@@ -147,3 +147,66 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
     cb.set_label('Absolute salinity [g/kg]')
 
     return fig
+
+
+##########################################################
+def plot_RT_mean_sections_from_mooring(ds_q_RT,ds_RT_loc):
+    plt.rcParams.update({'font.size': 14})
+
+    xticks = np.arange(-13.,-8,1)
+    xticklabels = ['13°W','12°W','11°W','10°W','9°W']
+
+    sigma_contours = [27.2,27.5, 27.7]
+    manual_locations = [(-12,100),(-12,900),(-12,1250)]
+
+    # Set up figure
+    fig,axs = plt.subplots(3,1,figsize=[10,13])
+
+    ds_q_RT.v.mean('time',keep_attrs=True).plot(
+        ax=axs[0],y='depth',x='lon',yincrease=False,cmap=cm.cm.balance)
+    ds_q_RT.SA.mean('time',keep_attrs=True).plot(
+        ax=axs[1],y='depth',x='lon',yincrease=False,cmap=cm.cm.haline)
+    ds_q_RT.CT.mean('time',keep_attrs=True).plot(
+        ax=axs[2],y='depth',x='lon',yincrease=False,cmap=cm.cm.thermal,vmin=0)
+
+    for ax in axs:
+        ax.fill_between(ds_q_RT.lon, -ds_q_RT.bathy,2300,color='grey')
+        (-ds_q_RT.bathy).plot.line('k',ax=ax)
+        CS = ds_q_RT.sigma0.mean('time',keep_attrs=True).where(
+            ds_q_RT.depth<=-ds_q_RT.bathy).plot.contour(
+            ax=ax,x='lon',levels=sigma_contours,yincrease=False,colors='k')
+        ax.clabel(CS,manual=manual_locations)
+
+        ax.vlines(ds_RT_loc.lon_RTWB,-ds_q_RT.bathy.sel(lon=ds_RT_loc.lon_RTWB,method='nearest'),
+                  0,colors='k',ls='--')
+        ax.vlines(ds_RT_loc.lon_RTES,-ds_q_RT.bathy.sel(lon=ds_RT_loc.lon_RTES,method='nearest'),
+                  0,colors='k',ls='--')
+        ax.vlines(ds_RT_loc.lon_RTWS,-ds_q_RT.bathy.sel(lon=ds_RT_loc.lon_RTWS,method='nearest'),
+                  0,colors='k',ls='--')
+
+        ax.vlines(ds_RT_loc.lon_RTADCP,-ds_q_RT.bathy.sel(lon=ds_RT_loc.lon_RTADCP,method='nearest'),
+                  0,colors='k')
+        ax.vlines(ds_RT_loc.lon_RTEB,-ds_q_RT.bathy.sel(lon=ds_RT_loc.lon_RTEB,method='nearest'),
+                  50,colors='k')
+        ax.vlines(ds_RT_loc.lon_RTWB1,-ds_q_RT.bathy.sel(lon=ds_RT_loc.lon_RTWB1,method='nearest'),
+                  50,colors='k')
+        ax.vlines(ds_RT_loc.lon_RTWB2,-ds_q_RT.bathy.sel(lon=ds_RT_loc.lon_RTWB2,method='nearest'),
+                  1000,colors='k')
+
+        d= 50.
+        ax.plot([ds_RT_loc.lon_RTES,ds_RT_loc.lon_RTWS],[d,d],'or')
+        ax.plot([ds_RT_loc.lon_RTWB],[d],'dy')
+        ax.plot([ds_RT_loc.lon_RTADCP],[d],'sb')
+        ax.plot([ds_RT_loc.lon_RTEB,ds_RT_loc.lon_RTWB1],[d,d],'^g')
+        ax.plot([ds_RT_loc.lon_RTWB2],[1000],'^g')
+
+        ax.set_xlim([-13.1,-9.])
+        ax.set_xlabel('')
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklabels,fontsize=14)
+        ax.grid()
+
+        ax.set_ylabel('Depth [m]')
+        ax.set_ylim([2300,0])
+        
+    return fig

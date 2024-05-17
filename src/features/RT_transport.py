@@ -447,6 +447,35 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots
     
     return Q_EW, q_EW
 #########################
+def combine_sections_tot_transp(ds_Q_WW,ds_Q_MB,ds_Q_EW):
+    ds_Q_tot= (ds_Q_WW.RT_Q_WW.rename('RT_Q_total').fillna(0
+                        )+ds_Q_EW.RT_Q_EW.rename('RT_Q_total').fillna(0
+                        )+ds_Q_MB.RT_Q_MB.rename('RT_Q_total')
+          ).to_dataset()
+
+    ds_Q_tot['RT_Qh_total']= ds_Q_WW.RT_Qh_WW.rename('RT_Qh_total').fillna(0
+                            )+ds_Q_EW.RT_Qh_EW.rename('RT_Qh_total').fillna(0
+                            )+ds_Q_MB.RT_Qh_MB.rename('RT_Qh_total')
+    ds_Q_tot['RT_Qf_total']= ds_Q_WW.RT_Qh_WW.rename('RT_Qf_total').fillna(0
+                            )+ds_Q_EW.RT_Qh_EW.rename('RT_Qf_total').fillna(0
+                            )+ds_Q_MB.RT_Qh_MB.rename('RT_Qf_total')
+    ds_Q_tot = ds_Q_tot.drop_vars(['mask_WW','mask_EW','longitude','latitude',
+                                  'lat_MB','lon_MB','time','PRES','depth'])
+    
+    units = 'Sv'
+    name = 'sum of western, eastern, and mid-basin volume transport'
+    ds_Q_tot['RT_Q_total'].attrs = dict(long_name=name, units=units)
+    
+    units = 'PW'
+    name = 'sum of western, eastern, and mid-basin freshwater transport'
+    ds_Q_tot['RT_Qh_total'].attrs = dict(long_name=name, units=units)
+
+    units ='Sv'
+    name = 'sum of western, eastern, and mid-basin freshwater transport'
+    ds_Q_tot['RT_Qf_total'].attrs = dict(long_name=name, units=units)
+
+    return ds_Q_tot
+########################
 
 # EKMAN TRANSPORT
 # Get normal and tangent to each section

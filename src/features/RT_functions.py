@@ -388,13 +388,12 @@ def lp_filt_loop(ds,lowcut,fs,dim,check_plots=False):
             with xr.set_options(keep_attrs=True):
                 ds[f'{var}_lp'] = lazy_butter_lp_filter(ds[var],lowcut,fs,dim=dim)
                 var_count +=1
-        elif: '_lp' in var:
+        elif '_lp' in var:
             print(f'{var} already in Dataset, will be overwritten')
-        elif: ds[var].size==1:
+        elif ds[var].size==1:
             print(f'{var} has length {ds[var].size}, no filter applied')
     
     if check_plots:
-        print(var_count)
         fig,axs = plt.subplots(var_count,1,figsize=[var_count*3,8],sharex=True)
         i=0
         for var in ds_vars:
@@ -574,6 +573,23 @@ def std_error(da,dim='TIME'):
     _,dof = decorrelation(da.fillna(0),da.fillna(0),dim,0);
     return da_std/np.sqrt(dof);
 
-
+def std_error_loop(ds):
+    ds_vars = ds.data_vars
+    var_count = 0
+    for var in ds_vars:
+        if ('_SE' not in var) and (ds[var].size>1):
+            with xr.set_options(keep_attrs=True):
+                ds[f'{var}_SE'] = std_error(ds[var])
+                
+                ds[f'{var}_SE'].attrs = {'name':f'{var}_SE',
+                        'long_name':f'Standard error of {var}',
+                         'units':ds[var].units}
+                var_count +=1
+        elif '_se' in var:
+            print(f'{var} already in Dataset, will be overwritten')
+        elif ds[var].size==1:
+            print(f'{var} has length {ds[var].size}, no se calculated')
+    
+    return ds
 
 

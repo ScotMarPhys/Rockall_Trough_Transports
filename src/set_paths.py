@@ -18,7 +18,7 @@ RT_transport_data_path_v1 = (local_data_dir/'3.0_Rockall_Trough_transports_2014_
 
 # suppl data
 GEBCO_data_path = (one_drive_data_dir/ 'data_GEBCO')
-GLORYS_data_path = (one_drive_data_dir/ 'data_GLORYS')
+GLORYS_data_path = (raw_data_dir/ 'data_GLORYS')
 ERA5_data_path = (one_drive_data_dir/ 'data_ERA5/Rockall_Trough')
 glider_data_path = (one_drive_data_dir/ 'data_seaglider')
 NAO_path = (one_drive_data_dir/'data_climate_indices/NAO')

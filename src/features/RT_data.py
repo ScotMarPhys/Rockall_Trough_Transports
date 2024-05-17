@@ -6,19 +6,118 @@ import gsw
 from pandas.tseries.offsets import DateOffset
 import cftime
 import datetime
+import numpy as np
 
 #local functions
 import sys; sys.path.append(r'../../')
 import src.set_paths as sps
 import src.features.matfile_functions as matlab_fct
 
-def load_glorys():
-    ds_GLORYS_re = xr.open_mfdataset(sps.GLORYS_fn_re)
-    ds_GLORYS_an = xr.open_mfdataset(sps.GLORYS_fn_an)
-    ds_GLORYS_an.coords['latitude'] = ds_GLORYS_re.latitude # lat and lon slightly different values, i.e. manually merge
-    ds_GLORYS_an.coords['longitude'] = ds_GLORYS_re.longitude
-    ds_GLORYS_an.coords['depth'] = ds_GLORYS_re.depth
-    ds_GLORYS = xr.concat([ds_GLORYS_re,ds_GLORYS_an],'time')
+def load_glorys(moor,tmin,tmax,dx=.5,dy=.5,zmin=0,zmax=1000):
+    GLORYS_data_path = (sps.raw_data_dir/'data_GLORYS')
+    GLORYS_data_path.mkdir(parents=True, exist_ok=True)
+    
+    RT_loc = load_RT_loc()
+    
+    coords_load = False
+    lon = RT_loc[f'lon_{moor}'].values
+    lat = RT_loc[f'lat_{moor}'].values
+
+    dlon = 0.2
+    dlat = 0.2
+    tmin_str = str(tmin.values)[:10]
+    tmax_str = str(tmax.values)[:10]
+    tmin_str2= f'{tmin_str[:4]}{tmin_str[5:7]}'
+    tmax_str2= f'{tmax_str[:4]}{tmax_str[5:7]}'
+    
+        
+    if (tmin<np.datetime64('2021-06') and tmax<=np.datetime64('2021-06')):
+        print('All data is in GLORYS reanalysis period')
+        data_type = ['my']
+        GLORYS_fn = f"cmems_mod_glo_phy_my_0.083deg_P1D-m_{moor}_{tmin_str2}_{tmax_str2}.nc"
+        if (GLORYS_data_path/GLORYS_fn).is_file()==0:
+
+            cm.subset(
+              dataset_id="cmems_mod_glo_phy_my_0.083deg_P1D-m",
+              dataset_version="202311",
+              variables=["uo", "vo"],
+              minimum_longitude=np.floor(lon-dx),
+              maximum_longitude=np.ceil(lon+dx),
+              minimum_latitude=np.floor(lat-dy),
+              maximum_latitude=np.ceil(lat+dy),
+              start_datetime=f'{tmin_str}T00:00:00',
+              end_datetime=f'{tmin_str}T00:00:00',
+              minimum_depth=zmin,
+              maximum_depth=zmax,
+              output_filename = GLORYS_fn,
+              output_directory = GLORYS_data_path
+            )
+
+    elif (tmin<=np.datetime64('2021-06') and tmax>np.datetime64('2021-06')):
+        print('Data is in GLORYS reanlysis and interim period')
+        data_type = ['my','myint']
+        GLORYS_fn_re = f"cmems_mod_glo_phy_my_0.083deg_P1D-m_{moor}_{tmin_str2}_202106.nc"
+        if (GLORYS_data_path/GLORYS_fn_re).is_file()==0:
+
+            cm.subset(
+              dataset_id="cmems_mod_glo_phy_my_0.083deg_P1D-m",
+              dataset_version="202311",
+              variables=["uo", "vo"],
+              minimum_longitude=np.floor(lon-dx),
+              maximum_longitude=np.ceil(lon+dx),
+              minimum_latitude=np.floor(lat-dy),
+              maximum_latitude=np.ceil(lat+dy),
+              start_datetime=f'{tmin_str}T00:00:00',
+              end_datetime="2021-06-30T00:00:00",
+              minimum_depth=zmin,
+              maximum_depth=zmax,
+              output_filename = GLORYS_fn_re,
+              output_directory = GLORYS_data_path
+            )
+
+        GLORYS_fn_an = f"cmems_mod_glo_phy_myint_0.083deg_P1D-m_{moor}_202107_{tmax_str2}.nc"
+        if (GLORYS_data_path/GLORYS_fn_an).is_file()==0:
+            cm.subset(
+              dataset_id="cmems_mod_glo_phy_myint_0.083deg_P1D-m",
+              dataset_version="202311",
+              variables=["uo", "vo"],
+              minimum_longitude=np.floor(lon-dx),
+              maximum_longitude=np.ceil(lon+dx),
+              minimum_latitude=np.floor(lat-dy),
+              maximum_latitude=np.ceil(lat+dy),
+              start_datetime="2021-07-01T00:00:00",
+              end_datetime=f'{tmax_str}T00:00:00',
+              minimum_depth=zmin,
+              maximum_depth=zmax,
+              output_filename = GLORYS_fn_an,
+              output_directory = GLORYS_data_path
+            )
+
+    elif tmin>np.datetime64('2021-06'):
+        print('All data is in GLORYS interim period')
+        GLORYS_fn = f"cmems_mod_glo_phy_myint_0.083deg_P1D-m_{moor}_{tmin_str2}_{tmax_str2}.nc"
+        if (GLORYS_data_path/GLORYS_fn).is_file()==0:
+            cm.subset(
+              dataset_id="cmems_mod_glo_phy_myint_0.083deg_P1D-m",
+              dataset_version="202311",
+              variables=["uo", "vo"],
+              minimum_longitude=np.floor(lon-dx),
+              maximum_longitude=np.ceil(lon+dx),
+              minimum_latitude=np.floor(lat-dy),
+              maximum_latitude=np.ceil(lat+dy),
+              start_datetime=f'{tmin_str}T00:00:00',
+              end_datetime=f'{tmax_str}T00:00:00',
+              minimum_depth=zmin,
+              maximum_depth=zmax,
+              output_filename = GLORYS_fn,
+              output_directory = GLORYS_data_path
+            )
+
+    if len(data_type)==1:
+        ds_GLORYS = xr.open_dataset((GLORYS_data_path/GLORYS_fn))
+    elif len(data_type)==2:
+        ds_GLORYS = xr.open_mfdataset([(GLORYS_data_path/GLORYS_fn_re),
+                                       (GLORYS_data_path/GLORYS_fn_an)])
     return ds_GLORYS
 
 def load_eap():
@@ -153,11 +252,10 @@ def make_attr(reg_short,reg_long,end_points,data_used,CT_ref,SA_ref,rho_ref=1027
     return attrs_Q,attrs_Qh,attrs_Qf,attrs_QS,attrs_q,attrs_qh,attrs_qf,attrs_qS
 
 def get_OSTIA_sst(moor,tmin,tmax):
-    raw_data_path = Path('../data/raw')
+    raw_data_path = sps.raw_data_dir
     OSTIA_data_path = (raw_data_path/'OSTIA_sst')
-    RT_mooring_loc = 'Ellet_array_mooring_location.csv'
 
-    RT_loc = load_RT_loc(raw_data_path,RT_mooring_loc)
+    RT_loc = load_RT_loc()
 
     lon = RT_loc[f'lon_{moor}'].values
     lat = RT_loc[f'lat_{moor}'].values

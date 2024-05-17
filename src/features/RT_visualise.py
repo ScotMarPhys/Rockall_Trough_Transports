@@ -22,6 +22,29 @@ from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
 from matplotlib import pyplot as plt
 
+def plot_figure_gap(v_merge,y_pred,py_str,y_pred_lp,py_lp_str,period=[None,None]):
+        fig,axs = plt.subplots(3,1,figsize=[15,8])
+        ax = axs[0]
+        v_merge[py_str].sel(TIME=slice(*period)).plot(label=py_str,lw=1,ax=ax,color='C1')
+        v_merge[y_pred].sel(TIME=slice(*period)).plot(label=f'pred {py_str}',lw=0.58,ax=ax,color='k')
+
+        ax = axs[1]
+        v_merge[py_lp_str].sel(TIME=slice(*period)).plot(
+            label=f'{py_str} {day_cutoff:.0f}d-lp',lw=1,ax=ax,color='C1')
+        v_merge[y_pred_lp].sel(TIME=slice(*period)).plot(
+            label=f'pred {py_str} {day_cutoff:.0f}d-lp',lw=0.58,ax=ax,color='k')
+        
+        ax = axs[2]
+        (v_merge[py_str]-v_merge[y_pred]).sel(TIME=slice(*period)).plot.line(
+            'x',label=f'residuals',lw=0.58,ax=ax,color='C0')
+        (v_merge[py_lp_str]-v_merge[y_pred_lp]).sel(TIME=slice(*period)).plot.line(
+            '+',label=f'residuals lp',lw=0.58,ax=ax,color='C2')
+
+        for ax in axs.flat:
+            ax.legend()
+            ax.set_title('')
+            ax.grid()
+
 def plot_moorings_paper(ds_RT,ds_RT_stacked):
     
     ds_cruises = rtd.load_cruise_list()

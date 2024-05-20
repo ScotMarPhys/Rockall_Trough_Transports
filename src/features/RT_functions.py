@@ -428,7 +428,7 @@ def xcorr_norm(x,y,dim):
         return corr,lags
 
     ######################################################
-def decorrelation(x,y,dim,doplot,precision=2):
+def decorrelation(x,y,dim,doplot,precision=2,print_text=False):
     # %% Compute auto-correlation of a variable; determine the weighted integral scale; 
     # % compute degrees of freedom in data series
     # % Compute the integral time scale and degrees of freedom in a timeseries
@@ -482,10 +482,10 @@ def decorrelation(x,y,dim,doplot,precision=2):
     elif idx==0:
         dcl=np.nan
         dof=len(y)
-
-    display(f'x has {len(y)} data cycles')
-    display(f'Integral time scale (days) = {dcl}')
-    display(f' : Degrees of freedom = {dof}')
+    if print_text:
+        display(f'x has {len(y)} data cycles')
+        display(f'Integral time scale (days) = {dcl}')
+        display(f' : Degrees of freedom = {dof}')
 
     if doplot:
         

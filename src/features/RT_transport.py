@@ -300,8 +300,10 @@ def calc_MB_3D_sections(ds_RT,ds_RT_loc,RT_hor_grid):
     lat_MB = xr.DataArray(((SF_MB_grid.lat_MB[:-1].values+SF_MB_grid.lat_MB[1:].values)/2),dims='lon_MB')
     q_MB_grid.coords['lat_MB']= lat_MB
     q_MB_grid['dx_MB'] = RT_hor_grid.dx_MB
+    v = q_MB_grid/(RT_hor_grid.dx_MB*ds_RT.dz)
 
     ds_RT_MB_grid = xr.merge([q_MB_grid.rename('q'),
+                              v.rename('v'),
                           TG_MB_grid.rename('CT').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB),
                           SG_MB_grid.rename('SA').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB)])
     return ds_RT_MB_grid
@@ -358,6 +360,8 @@ def calc_WW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,check_plots=True):
 
     # Transport in each cell
     q_WW = RT_hor_grid.dx_WW*ds_RT.dz*(v_WW/1e2)
+    q_WW = q_WW.rename('q_WW').to_dataset()
+    q_WW['v']=v_WW
 
     # Integrate for transport timeseries (Sv)
     Q_WW = q_WW.sum(['depth','lon_WW'],min_count=1)/1e6 
@@ -426,7 +430,9 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots
     v_EW = v_EW.where(v_EW.depth<-1*bathy_EW)
 
     # Transport in each cell
-    q_EW = RT_hor_grid.dx_EW*ds_RT.dz*(v_EW)
+    q_EW = (RT_hor_grid.dx_EW*ds_RT.dz*(v_EW)).rename('q_EW').to_dataset()
+    q_EW['v']=v_EW
+    
 
     # Integrate for transport timeseries (Sv)
     Q_EW = q_EW.sum(['depth','lon_EW'],min_count=1)/1e6
@@ -561,6 +567,10 @@ def calc_fluxes(Q,q,CT,SA,dims,sec_str):
     qf = -1*q*(SA - rtp.SA_ref)/rtp.SA_ref
     qS = q*SA/rtp.rho0
     
+    mask = q.notnull()
+    qCT = (CT*q.notnull()).where(mask)
+    qSA = (SA*q.notnull()).where(mask)
+    
     Qh = qh.sum(dims)/1e15
     Qf = qf.sum(dims)/1e6
     QS = qS.sum(dims)/1e3
@@ -605,8 +615,8 @@ def calc_fluxes(Q,q,CT,SA,dims,sec_str):
     Qf.attrs['description']=f'Freshwater flux at {sec_str} of Rockall Trough'\
     f' Reference absolute salinity {rtp.SA_ref} (g/kg)'
     
-    QS.attrs['name']= f'RT_QS_EW'
-    QS.attrs['long_name']= f'RT EW salt flux'
+    QS.attrs['name']= f'RT_QS_{sec_str}'
+    QS.attrs['long_name']= f'RT {sec_str} salt flux'
     QS.attrs['units']='Sv'
     QS.attrs['description']=f'Salt flux at {sec_str} of Rockall Trough'\
     f' Reference density {rtp.rho0} (kg/m^3)'

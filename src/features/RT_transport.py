@@ -305,7 +305,8 @@ def calc_MB_3D_sections(ds_RT,ds_RT_loc,RT_hor_grid):
     ds_RT_MB_grid = xr.merge([q_MB_grid.rename('q'),
                               v.rename('v'),
                           TG_MB_grid.rename('CT').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB),
-                          SG_MB_grid.rename('SA').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB)])
+                          SG_MB_grid.rename('SA').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB)]
+                            ).rename({'lat_MB':'lat','lon_MB':'lon','dx_MB':'dx'})
     return ds_RT_MB_grid
 
 #########################
@@ -360,11 +361,29 @@ def calc_WW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,check_plots=True):
 
     # Transport in each cell
     q_WW = RT_hor_grid.dx_WW*ds_RT.dz*(v_WW/1e2)
+    
+    # get CT and SA
+    mask = q_WW.notnull()
+    qCT = (ds_RT.TG_WEST*q_WW.notnull()).where(mask)
+    qSA = (ds_RT.SG_WEST*q_WW.notnull()).where(mask)
+    
     q_WW = q_WW.rename('q_WW').to_dataset()
     q_WW['v']=v_WW
+    q_WW['CT'] = qCT
+    q_WW['SA'] = qSA
+    
+    # Add attributes
+    vel_attrs = {'long_name':'Across section velocity',
+                 'units':'m/s'}
+    CT_attrs = {'long_name':'Conservative temperature',
+              'description':'conservative temperature TEOS-10',
+              'units':'degC'}
+    SA_attrs = {'long_name':'Absolute salinity',
+            'description':'Absolute salinity TEOS-10',
+             'units':'g/kg'}
 
     # Integrate for transport timeseries (Sv)
-    Q_WW = q_WW.sum(['depth','lon_WW'],min_count=1)/1e6 
+    Q_WW = q_WW.q_WW.sum(['depth','lon_WW'],min_count=1)/1e6 
     Q_WW.coords['mask_WW'] = ds_RT.v_RTWB.isel(depth=50).notnull()
     Q_WW.attrs['name']= 'RT_Q_WW'
     Q_WW.attrs['long_name']= 'RT WW Volume Transport'
@@ -383,6 +402,7 @@ def calc_WW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,check_plots=True):
     return Q_WW, q_WW
 ##########################
 def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots=True):
+    
     # Get section bathymetry
     lon_EW = RT_hor_grid.lon_EW
     lat_EW = RT_hor_grid.lat_EW
@@ -431,11 +451,29 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots
 
     # Transport in each cell
     q_EW = (RT_hor_grid.dx_EW*ds_RT.dz*(v_EW)).rename('q_EW').to_dataset()
+    
+    #get tracer
+    mask = q_EW.notnull()
+    qCT = (ds_RT.TG_EAST*q_EW.notnull()).where(mask)
+    qSA = (ds_RT.SG_EAST*q_EW.notnull()).where(mask)
+    
     q_EW['v']=v_EW
+    q_WW['CT'] = qCT
+    q_WW['SA'] = qSA
+    
+    # Add attributes
+    vel_attrs = {'long_name':'Across section velocity',
+                 'units':'m/s'}
+    CT_attrs = {'long_name':'Conservative temperature',
+              'description':'conservative temperature TEOS-10',
+              'units':'degC'}
+    SA_attrs = {'long_name':'Absolute salinity',
+            'description':'Absolute salinity TEOS-10',
+             'units':'g/kg'}
     
 
     # Integrate for transport timeseries (Sv)
-    Q_EW = q_EW.sum(['depth','lon_EW'],min_count=1)/1e6
+    Q_EW = q_EW.q_EW.sum(['depth','lon_EW'],min_count=1)/1e6
     Q_EW.coords['mask_EW'] = ds_RT.V_WEST_1.isel(depth=50).notnull()
     Q_EW.attrs['name']= 'RT_Q_EW'
     Q_EW.attrs['long_name']= 'RT EW Volume Transport'
@@ -557,7 +595,7 @@ def calc_Ekman_transport(ds_ERA5, RT_hor_grid,ds_RT_loc,check_plots=True):
         plt.grid()
         plt.legend()
     
-    return RT_Q_Ek,q_Ek_EW
+    return RT_Q_Ek
 
 #########################
 def calc_fluxes(Q,q,CT,SA,dims,sec_str): 

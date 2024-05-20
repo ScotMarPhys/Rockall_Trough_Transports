@@ -281,6 +281,30 @@ def ds_rt_swap_vert_dim(ds_RT,dim='PRES'):
     ds_RT_swap = ds_RT_swap.interp(depth=ds_RT[dim].values)
     return ds_RT_swap
 
+def prep_mooring_data_for_transport_calc(ds_RT,ds_RT_loc):
+    
+    #remove nan at beginning and end
+    ds_RT = ds_RT.where(ds_RT.TG_EAST.sel(PRES=500).notnull().drop_vars('PRES'),drop=True)
+
+    # extrapolate upper values of velocity
+    dim_x = 'TIME'
+    dim_y = 'PRES'
+    graphics = False
+    ds_RT = extr_moored_RT_timeseries(ds_RT,dim_x,dim_y,graphics=graphics)
+
+    #linearly interpolate over time gaps in velocity fields
+    ds_RT = ds_RT.interpolate_na(dim='TIME')
+
+    # Get z from P
+    ds_RT.coords['depth'] = gsw.z_from_p(ds_RT.PRES,np.mean([ds_RT_loc.lat_RTWB, ds_RT_loc.lat_RTEB]))
+    ds_RT.depth.attrs = {'name' :'depth',
+                         'units' :'m',}
+    # Create merged WB1/2 CM
+    ds_RT = merge_RT_WB1_2(ds_RT)
+
+    ds_RT = ds_rt_swap_vert_dim(ds_RT)
+    return ds_RT
+
 #######################################
 def calc_SA_CT_sigma0(ds):
     

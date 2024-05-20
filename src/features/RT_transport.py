@@ -121,7 +121,6 @@ def gsw_geo_strf_dyn_height(SA,CT,P,P_ref):
         dask='parallelized')
     return y
 
-#######################################
 
 def calc_MB_transport(ds_RT,ds_RT_loc,sens_analysis=True,check_plots=True):
     # Get Coriolis freq
@@ -146,7 +145,8 @@ def calc_MB_transport(ds_RT,ds_RT_loc,sens_analysis=True,check_plots=True):
     Q_MB.attrs['long_name']= 'RT MB Volume Transport'
     Q_MB.attrs['units']='Sv'
     Q_MB.attrs['description']='Mid basin volume transport in Rockall Trough'\
-    ' derived from dynamic height difference between the moorings RTEB1 and RTWB1+2'
+    ' derived from dynamic height difference between the moorings RTEB1 and RTWB1+2'\
+    f' with reference pressure {P_ref}'
 
     if sens_analysis:
         ## Some sensitivity analysis - extra
@@ -211,9 +211,10 @@ def calc_MB_transport(ds_RT,ds_RT_loc,sens_analysis=True,check_plots=True):
                         Q_MB_CTfix.rename(Q_MB_CTfix.attrs['name']),
                         Q_MB_SAfix_CTfix.rename(Q_MB_SAfix_CTfix.attrs['name']),
                         Q_MB_WB_CTvar.rename(Q_MB_WB_CTvar.attrs['name']),
-                        Q_MB_EB_CTvar.rename(Q_MB_EB_CTvar.attrs['name'])])
+                        Q_MB_EB_CTvar.rename(Q_MB_EB_CTvar.attrs['name'])]
+                          ).drop_vars(['lat_MB','lon_MB'])
     else:
-        RT_Q_MB = Q_MB
+        RT_Q_MB = Q_MB.drop_vars(['lat_MB','lon_MB'])
         
     #check plots
     if check_plots:
@@ -257,7 +258,8 @@ def calc_MB_transport(ds_RT,ds_RT_loc,sens_analysis=True,check_plots=True):
             axs.set_ylabel('Volume \nTransport (Sv)')
             fig.tight_layout()
     
-    return RT_Q_MB, q_MB
+    return RT_Q_MB,q_MB.rename({'lat_MB':'lat','lon_MB':'lon'})
+
 
 #########################################################
 
@@ -306,9 +308,24 @@ def calc_MB_3D_sections(ds_RT,ds_RT_loc,RT_hor_grid):
                               v.rename('v'),
                           TG_MB_grid.rename('CT').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB),
                           SG_MB_grid.rename('SA').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB)]
-                            ).rename({'lat_MB':'lat','lon_MB':'lon','dx_MB':'dx'})
+                            )
+    ds_RT_MB_grid.coords['mask'] = q_MB_grid.notnull()
+    ds_RT_MB_grid = ds_RT_MB_grid.rename({'lat_MB':'lat','lon_MB':'lon','dx_MB':'dx'})
+    
+    
+    ds_RT_MB_grid.q.attrs={'long_name':f'Volume transport per grid cell',
+            'units':'Sv',
+            'description':f'Volume transport per grid cell for RT MB'}
+    ds_RT_MB_grid.v.attrs = {'long_name':'Across section velocity',
+                 'units':'m/s'}
+    ds_RT_MB_grid.CT.attrs = {'long_name':'Conservative temperature',
+              'description':'conservative temperature TEOS-10',
+              'units':'degC'}
+    ds_RT_MB_grid.SA.attrs = {'long_name':'Absolute salinity',
+            'description':'Absolute salinity TEOS-10',
+             'units':'g/kg'}
+    
     return ds_RT_MB_grid
-
 #########################
 
 def calc_WW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,check_plots=True):
@@ -318,8 +335,11 @@ def calc_WW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,check_plots=True):
             ).drop(['lon','lat'])
     bathy_WW.coords['lon_WW']=RT_hor_grid.lon_WW
     
+    # use m/s
+    ds_RT['v_RTWB']=ds_RT.v_RTWB/1e2
+    
     # get meridional velocity
-    v_WW = ds_RT.v_RTWB.rename('v_WW').compute()
+    v_WW = (ds_RT.v_RTWB).rename('v_WW').compute()
     (v_WW,_) = xr.broadcast(v_WW,xr.DataArray(RT_hor_grid.lon_WW, dims="lon_WW"))
     v_WW.coords['lon_WW']=RT_hor_grid.lon_WW
     v_WW.coords['lat_WW']=RT_hor_grid.lat_WW
@@ -360,36 +380,42 @@ def calc_WW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,check_plots=True):
     v_WW = v_WW.fillna(0).where(v_WW.depth<-1*bathy_WW)
 
     # Transport in each cell
-    q_WW = RT_hor_grid.dx_WW*ds_RT.dz*(v_WW/1e2)
+    q_WW = RT_hor_grid.dx_WW*ds_RT.dz*(v_WW)
     
     # get CT and SA
     mask = q_WW.notnull()
     qCT = (ds_RT.TG_WEST*q_WW.notnull()).where(mask)
     qSA = (ds_RT.SG_WEST*q_WW.notnull()).where(mask)
     
-    q_WW = q_WW.rename('q_WW').to_dataset()
+    q_WW = q_WW.rename('q').to_dataset()
     q_WW['v']=v_WW
     q_WW['CT'] = qCT
     q_WW['SA'] = qSA
+    q_WW.coords['dx'] = RT_hor_grid.dx_WW
+    q_WW.coords['mask'] = mask
     
     # Add attributes
-    vel_attrs = {'long_name':'Across section velocity',
+    q_WW.q.attrs={'long_name':f'Volume transport per grid cell',
+            'units':'Sv',
+            'description':f'Volume transport per grid cell for RT WW'}
+    q_WW.v.attrs = {'long_name':'Across section velocity',
                  'units':'m/s'}
-    CT_attrs = {'long_name':'Conservative temperature',
+    q_WW.CT.attrs = {'long_name':'Conservative temperature',
               'description':'conservative temperature TEOS-10',
               'units':'degC'}
-    SA_attrs = {'long_name':'Absolute salinity',
+    q_WW.SA.attrs = {'long_name':'Absolute salinity',
             'description':'Absolute salinity TEOS-10',
              'units':'g/kg'}
 
     # Integrate for transport timeseries (Sv)
-    Q_WW = q_WW.q_WW.sum(['depth','lon_WW'],min_count=1)/1e6 
+    Q_WW = q_WW.q.sum(['depth','lon_WW'],min_count=1)/1e6 
     Q_WW.coords['mask_WW'] = ds_RT.v_RTWB.isel(depth=50).notnull()
     Q_WW.attrs['name']= 'RT_Q_WW'
     Q_WW.attrs['long_name']= 'RT WW Volume Transport'
     Q_WW.attrs['units']='Sv'
     Q_WW.attrs['description']='Volume transport at western wedge of Rockall Trough'\
     ' derived from moored velocity measurements at RTWB1+2'
+    Q_WW = Q_WW.drop_vars(['depth','PRES'])
     
     if check_plots:
         fig,axs=plt.subplots(1,1,figsize=[6,4])
@@ -399,7 +425,7 @@ def calc_WW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,check_plots=True):
         axs.set_ylabel('Volume \nTransport (Sv)')
         fig.tight_layout()
 
-    return Q_WW, q_WW
+    return Q_WW, q_WW.rename({'lon_WW':'lon','lat_WW':'lat'})
 ##########################
 def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots=True):
     
@@ -450,36 +476,43 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots
     v_EW = v_EW.where(v_EW.depth<-1*bathy_EW)
 
     # Transport in each cell
-    q_EW = (RT_hor_grid.dx_EW*ds_RT.dz*(v_EW)).rename('q_EW').to_dataset()
+    q_EW = (RT_hor_grid.dx_EW*ds_RT.dz*(v_EW)).rename('q').to_dataset(
+            )
     
     #get tracer
-    mask = q_EW.notnull()
-    qCT = (ds_RT.TG_EAST*q_EW.notnull()).where(mask)
-    qSA = (ds_RT.SG_EAST*q_EW.notnull()).where(mask)
+    mask = q_EW.q.notnull()
+    qCT = (ds_RT.TG_EAST*q_EW.q.notnull()).where(mask)
+    qSA = (ds_RT.SG_EAST*q_EW.q.notnull()).where(mask)
     
     q_EW['v']=v_EW
-    q_WW['CT'] = qCT
-    q_WW['SA'] = qSA
+    q_EW['CT'] = qCT
+    q_EW['SA'] = qSA
+    q_EW.coords['dx'] = RT_hor_grid.dx_EW
+    q_EW.coords['mask'] = mask
     
     # Add attributes
-    vel_attrs = {'long_name':'Across section velocity',
+    q_EW.q.attrs={'long_name':f'Volume transport per grid cell',
+            'units':'Sv',
+            'description':f'Volume transport per grid cell for RT EW'}
+    q_EW.v.attrs = {'long_name':'Across section velocity',
                  'units':'m/s'}
-    CT_attrs = {'long_name':'Conservative temperature',
+    q_EW.CT.attrs = {'long_name':'Conservative temperature',
               'description':'conservative temperature TEOS-10',
               'units':'degC'}
-    SA_attrs = {'long_name':'Absolute salinity',
+    q_EW.SA.attrs = {'long_name':'Absolute salinity',
             'description':'Absolute salinity TEOS-10',
              'units':'g/kg'}
-    
+    q_EW = q_EW.drop_vars(['longitude','latitude','time'])
 
     # Integrate for transport timeseries (Sv)
-    Q_EW = q_EW.q_EW.sum(['depth','lon_EW'],min_count=1)/1e6
+    Q_EW = q_EW.q.sum(['depth','lon_EW'],min_count=1)/1e6
     Q_EW.coords['mask_EW'] = ds_RT.V_WEST_1.isel(depth=50).notnull()
     Q_EW.attrs['name']= 'RT_Q_EW'
     Q_EW.attrs['long_name']= 'RT EW Volume Transport'
     Q_EW.attrs['units']='Sv'
     Q_EW.attrs['description']='Volume transport at eastern wedge of Rockall Trough'\
     ' derived from moored velocity measurements at RTEB1'
+    Q_EW = Q_EW.drop_vars(['depth','PRES'])
 
     if check_plots:
         fig,axs=plt.subplots(1,1,figsize=[6,4])
@@ -489,34 +522,42 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots
         axs.set_ylabel('Volume \nTransport (Sv)')
         fig.tight_layout()
     
-    return Q_EW, q_EW
+    return Q_EW, q_EW.rename({'lon_EW':'lon','lat_EW':'lat'})
+
 #########################
+
 def combine_sections_tot_transp(ds_Q_WW,ds_Q_MB,ds_Q_EW):
-    ds_Q_tot= (ds_Q_WW.RT_Q_WW.rename('RT_Q_total').fillna(0
-                        )+ds_Q_EW.RT_Q_EW.rename('RT_Q_total').fillna(0
-                        )+ds_Q_MB.RT_Q_MB.rename('RT_Q_total')
+    ds_Q_tot= (ds_Q_WW.RT_Q.rename('RT_Q_total').fillna(0
+                        )+ds_Q_EW.RT_Q.rename('RT_Q_total').fillna(0
+                        )+ds_Q_MB.RT_Q.rename('RT_Q_total')
           ).to_dataset()
 
-    ds_Q_tot['RT_Qh_total']= ds_Q_WW.RT_Qh_WW.rename('RT_Qh_total').fillna(0
-                            )+ds_Q_EW.RT_Qh_EW.rename('RT_Qh_total').fillna(0
-                            )+ds_Q_MB.RT_Qh_MB.rename('RT_Qh_total')
-    ds_Q_tot['RT_Qf_total']= ds_Q_WW.RT_Qh_WW.rename('RT_Qf_total').fillna(0
-                            )+ds_Q_EW.RT_Qh_EW.rename('RT_Qf_total').fillna(0
-                            )+ds_Q_MB.RT_Qh_MB.rename('RT_Qf_total')
-    ds_Q_tot = ds_Q_tot.drop_vars(['mask_WW','mask_EW','longitude','latitude',
-                                  'lat_MB','lon_MB','time','PRES','depth'])
+    ds_Q_tot['RT_Qh_total']= ds_Q_WW.RT_Qh.rename('RT_Qh_total').fillna(0
+                            )+ds_Q_EW.RT_Qh.rename('RT_Qh_total').fillna(0
+                            )+ds_Q_MB.RT_Qh.rename('RT_Qh_total')
+    ds_Q_tot['RT_Qf_total']= ds_Q_WW.RT_Qf.rename('RT_Qf_total').fillna(0
+                            )+ds_Q_EW.RT_Qf.rename('RT_Qf_total').fillna(0
+                            )+ds_Q_MB.RT_Qf.rename('RT_Qf_total')
+    ds_Q_tot = ds_Q_tot
     
+    
+    desc_str = 'Sum of western, eastern, and mid-basin'
     units = 'Sv'
-    name = 'sum of western, eastern, and mid-basin volume transport'
-    ds_Q_tot['RT_Q_total'].attrs = dict(long_name=name, units=units)
+    name = 'Volume transport'
+    ds_Q_tot['RT_Q_total'].attrs = dict(long_name=name, units=units,
+                                       description = f'{desc_str} {name}')
     
     units = 'PW'
-    name = 'sum of western, eastern, and mid-basin freshwater transport'
-    ds_Q_tot['RT_Qh_total'].attrs = dict(long_name=name, units=units)
+    name = 'Heat transport'
+    ds_Q_tot['RT_Qh_total'].attrs = dict(long_name=name, units=units,
+                                       description = f'{desc_str} {name}')
 
     units ='Sv'
-    name = 'sum of western, eastern, and mid-basin freshwater transport'
-    ds_Q_tot['RT_Qf_total'].attrs = dict(long_name=name, units=units)
+    name = 'Freshwater transport'
+    ds_Q_tot['RT_Qf_total'].attrs = dict(long_name=name, units=units,
+                                       description = f'{desc_str} {name}')
+    
+    ds_Q_tot.attrs['description'] = f'{desc_str} volume, heat and freshwater transports'
 
     return ds_Q_tot
 ########################
@@ -598,7 +639,7 @@ def calc_Ekman_transport(ds_ERA5, RT_hor_grid,ds_RT_loc,check_plots=True):
     return RT_Q_Ek
 
 #########################
-def calc_fluxes(Q,q,CT,SA,dims,sec_str): 
+def calc_transports(Q,q,CT,SA,dims,sec_str): 
     
     #calculations
     qh = rtp.rhoCp*q*(CT - rtp.CT_ref)
@@ -614,22 +655,22 @@ def calc_fluxes(Q,q,CT,SA,dims,sec_str):
     QS = qS.sum(dims)/1e3
     
     #attributes
-    q_attrs={'name':f'RT_q_{sec_str}',
-            'long_name':f'RT {sec_str} volume transport per grid cell',
+    q_attrs={'name':f'RT_q',
+            'long_name':f'Volume transport per grid cell',
             'units':'Sv',
             'description':f'Volume transport per grid cell for RT {sec_str}'}
-    qh_attrs={'name':f'RT_qh_{sec_str}',
-            'long_name':f'RT {sec_str} heat transport per grid cell',
+    qh_attrs={'name':f'RT_qh',
+            'long_name':f'Heat transport per grid cell',
             'units':'PW',
             'description':f'Heat transport per grid cell referenced '\
             f'to temperature of {rtp.CT_ref}degC for RT {sec_str}'}
-    qf_attrs = {'name': f'RT_qf_{sec_str}',
-                'long_name': f'RT {sec_str} freshwater transport per grid cell',
+    qf_attrs = {'name': f'RT_qf',
+                'long_name': f'Freshwater transport per grid cell',
                 'units':'Sv',
                 'description':f'Freshwater transport per grid cell referenced '\
                 f'to salinity of {rtp.SA_ref} g/kg for RT {sec_str}'}
-    qS_attrs = {'name': f'RT_qS_{sec_str}',
-                'long_name': f'RT {sec_str} salt transport per grid cell',
+    qS_attrs = {'name': f'RT_qS',
+                'long_name': f'Salt transport per grid cell',
                 'units':'Sv',
                 'description':f'Salt transport per grid cell referenced '\
                 f'to density time specific heat capacity of of {rtp.rho0}kg m^-3'\
@@ -640,23 +681,27 @@ def calc_fluxes(Q,q,CT,SA,dims,sec_str):
     qf.attrs =qf_attrs
     qS.attrs =qS_attrs
     
+    Q.attrs['name']= f'RT_Q'
+    Q.attrs['long_name']= f'Volume Transport'
+    Q.attrs['units']=Q.units
+    Q.attrs['description']=Q.description
     
-    Qh.attrs['name']= f'RT_Qh_{sec_str}'
-    Qh.attrs['long_name']= f'RT {sec_str} Heat Flux'
+    Qh.attrs['name']= f'RT_Qh'
+    Qh.attrs['long_name']= f'Heat transport'
     Qh.attrs['units']='PW'
-    Qh.attrs['description']=f'Heat flux at {sec_str} of Rockall Trough'\
+    Qh.attrs['description']=f'Heat transport at {sec_str} of Rockall Trough'\
     f' Reference temperature {rtp.CT_ref}degC'
     
-    Qf.attrs['name']= f'RT_Qf_{sec_str}'
-    Qf.attrs['long_name']= f'RT {sec_str} Freshwater flux'
+    Qf.attrs['name']= f'RT_Qf'
+    Qf.attrs['long_name']= f'Freshwater transport'
     Qf.attrs['units']='Sv'
-    Qf.attrs['description']=f'Freshwater flux at {sec_str} of Rockall Trough'\
+    Qf.attrs['description']=f'Freshwater transport at {sec_str} of Rockall Trough'\
     f' Reference absolute salinity {rtp.SA_ref} (g/kg)'
     
-    QS.attrs['name']= f'RT_QS_{sec_str}'
-    QS.attrs['long_name']= f'RT {sec_str} salt flux'
+    QS.attrs['name']= f'RT_QS'
+    QS.attrs['long_name']= f'Salt transport'
     QS.attrs['units']='Sv'
-    QS.attrs['description']=f'Salt flux at {sec_str} of Rockall Trough'\
+    QS.attrs['description']=f'Salt transport at {sec_str} of Rockall Trough'\
     f' Reference density {rtp.rho0} (kg/m^3)'
     
     ds_Q = xr.merge([Q.rename(Q.attrs['name']),
@@ -671,7 +716,7 @@ def calc_fluxes(Q,q,CT,SA,dims,sec_str):
     if 'mask' in str(Q.coords):
         ds_Q.coords[f'mask_{sec_str[:2]}'] = Q[f'mask_{sec_str[:2]}']
     
-    ds_Q.attrs = {'description':f'Volume, heat, freshwater and salt flux for {sec_str} of Rockall Trough'}
+    ds_Q.attrs = {'description':f'Volume, heat, freshwater and salt tranport for {sec_str} of Rockall Trough'}
     ds_q.attrs = {'description':f'Volume, heat, freshwater and salt tranport'\
                     f' per grid cell for {sec_str} of Rockall Trough'}
     

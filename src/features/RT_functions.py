@@ -24,6 +24,13 @@ import src.set_paths as sps
 import src.features.RT_data as rtd
 import src.features.matfile_functions as matlab_fct
 
+def rename_vars(ds,var_str):
+    ds_new = xr.Dataset()
+    for var in ds.data_vars:
+        ds_new[f'{var}_{var_str}']=ds[var]
+        ds_new[f'{var}_{var_str}'].attrs['name'] = f'{var}_{var_str}'
+    return ds_new
+
 def normalise_and_predict(x,y,dim):
     # first normalise the variable x
     xnorm = (x - x.mean(dim)) / (x.std(dim));
@@ -603,7 +610,7 @@ def std_error_loop(ds):
     for var in ds_vars:
         if ('_SE' not in var) and (ds[var].size>1):
             with xr.set_options(keep_attrs=True):
-                ds[f'{var}_SE'] = std_error(ds[var])
+                ds[f'{var}_SE'] = (std_error(ds[var])).compute()
                 
                 ds[f'{var}_SE'].attrs = {'name':f'{var}_SE',
                         'long_name':f'Standard error of {var}',

@@ -527,34 +527,34 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots
 #########################
 
 def combine_sections_tot_transp(ds_Q_WW,ds_Q_MB,ds_Q_EW):
-    ds_Q_tot= (ds_Q_WW.RT_Q.rename('RT_Q_total').fillna(0
-                        )+ds_Q_EW.RT_Q.rename('RT_Q_total').fillna(0
-                        )+ds_Q_MB.RT_Q.rename('RT_Q_total')
+    ds_Q_tot= (ds_Q_WW.Q.rename('Q_total').fillna(0
+                        )+ds_Q_EW.Q.rename('Q_total').fillna(0
+                        )+ds_Q_MB.Q.rename('Q_total')
           ).to_dataset()
 
-    ds_Q_tot['RT_Qh_total']= ds_Q_WW.RT_Qh.rename('RT_Qh_total').fillna(0
-                            )+ds_Q_EW.RT_Qh.rename('RT_Qh_total').fillna(0
-                            )+ds_Q_MB.RT_Qh.rename('RT_Qh_total')
-    ds_Q_tot['RT_Qf_total']= ds_Q_WW.RT_Qf.rename('RT_Qf_total').fillna(0
-                            )+ds_Q_EW.RT_Qf.rename('RT_Qf_total').fillna(0
-                            )+ds_Q_MB.RT_Qf.rename('RT_Qf_total')
+    ds_Q_tot['Qh_total']= ds_Q_WW.Qh.rename('Qh_total').fillna(0
+                            )+ds_Q_EW.Qh.rename('Qh_total').fillna(0
+                            )+ds_Q_MB.Qh.rename('Qh_total')
+    ds_Q_tot['Qf_total']= ds_Q_WW.Qf.rename('Qf_total').fillna(0
+                            )+ds_Q_EW.Qf.rename('Qf_total').fillna(0
+                            )+ds_Q_MB.Qf.rename('Qf_total')
     ds_Q_tot = ds_Q_tot
     
     
     desc_str = 'Sum of western, eastern, and mid-basin'
     units = 'Sv'
     name = 'Volume transport'
-    ds_Q_tot['RT_Q_total'].attrs = dict(long_name=name, units=units,
+    ds_Q_tot['Q_total'].attrs = dict(long_name=name, units=units,
                                        description = f'{desc_str} {name}')
     
     units = 'PW'
     name = 'Heat transport'
-    ds_Q_tot['RT_Qh_total'].attrs = dict(long_name=name, units=units,
+    ds_Q_tot['Qh_total'].attrs = dict(long_name=name, units=units,
                                        description = f'{desc_str} {name}')
 
     units ='Sv'
     name = 'Freshwater transport'
-    ds_Q_tot['RT_Qf_total'].attrs = dict(long_name=name, units=units,
+    ds_Q_tot['Qf_total'].attrs = dict(long_name=name, units=units,
                                        description = f'{desc_str} {name}')
     
     ds_Q_tot.attrs['description'] = f'{desc_str} volume, heat and freshwater transports'
@@ -655,21 +655,21 @@ def calc_transports(Q,q,CT,SA,dims,sec_str):
     QS = qS.sum(dims)/1e3
     
     #attributes
-    q_attrs={'name':f'RT_q',
+    q_attrs={'name':f'q',
             'long_name':f'Volume transport per grid cell',
             'units':'Sv',
             'description':f'Volume transport per grid cell for RT {sec_str}'}
-    qh_attrs={'name':f'RT_qh',
+    qh_attrs={'name':f'qh',
             'long_name':f'Heat transport per grid cell',
             'units':'PW',
             'description':f'Heat transport per grid cell referenced '\
             f'to temperature of {rtp.CT_ref}degC for RT {sec_str}'}
-    qf_attrs = {'name': f'RT_qf',
+    qf_attrs = {'name': f'qf',
                 'long_name': f'Freshwater transport per grid cell',
                 'units':'Sv',
                 'description':f'Freshwater transport per grid cell referenced '\
                 f'to salinity of {rtp.SA_ref} g/kg for RT {sec_str}'}
-    qS_attrs = {'name': f'RT_qS',
+    qS_attrs = {'name': f'qS',
                 'long_name': f'Salt transport per grid cell',
                 'units':'Sv',
                 'description':f'Salt transport per grid cell referenced '\
@@ -681,24 +681,24 @@ def calc_transports(Q,q,CT,SA,dims,sec_str):
     qf.attrs =qf_attrs
     qS.attrs =qS_attrs
     
-    Q.attrs['name']= f'RT_Q'
+    Q.attrs['name']= f'Q'
     Q.attrs['long_name']= f'Volume Transport'
     Q.attrs['units']=Q.units
     Q.attrs['description']=Q.description
     
-    Qh.attrs['name']= f'RT_Qh'
+    Qh.attrs['name']= f'Qh'
     Qh.attrs['long_name']= f'Heat transport'
     Qh.attrs['units']='PW'
     Qh.attrs['description']=f'Heat transport at {sec_str} of Rockall Trough'\
     f' Reference temperature {rtp.CT_ref}degC'
     
-    Qf.attrs['name']= f'RT_Qf'
+    Qf.attrs['name']= f'Qf'
     Qf.attrs['long_name']= f'Freshwater transport'
     Qf.attrs['units']='Sv'
     Qf.attrs['description']=f'Freshwater transport at {sec_str} of Rockall Trough'\
     f' Reference absolute salinity {rtp.SA_ref} (g/kg)'
     
-    QS.attrs['name']= f'RT_QS'
+    QS.attrs['name']= f'QS'
     QS.attrs['long_name']= f'Salt transport'
     QS.attrs['units']='Sv'
     QS.attrs['description']=f'Salt transport at {sec_str} of Rockall Trough'\
@@ -721,3 +721,8 @@ def calc_transports(Q,q,CT,SA,dims,sec_str):
                     f' per grid cell for {sec_str} of Rockall Trough'}
     
     return ds_Q,ds_q
+
+def add_da_to_ds(ds,ds_q,da=['qh','qf']):
+    for var in da:
+        ds[var]=ds_q[var]
+    return ds

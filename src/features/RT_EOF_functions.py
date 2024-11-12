@@ -62,7 +62,6 @@ def plot_EOF(model,dim,EOF=True,PC=False):
         axhdl = scores.plot.line(x="time", col="mode", lw=1, ylim=(-0.2, 0.2))
         for i,ax in enumerate(axhdl.axes.flat):
             ax.axhline(0,color='k',ls='--')
-        plt.legend()
         plt.tight_layout()
         plt.show()
     
@@ -93,13 +92,53 @@ def plot_EOF(model,dim,EOF=True,PC=False):
 
 def EOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x'):
     kwargs = dict(n_modes = n_modes, use_coslat=False,check_nans=True)
-    model = xe.models.EOF( **kwargs)
+    model = xe.single.EOF( **kwargs)
     # model = xe.models.ComplexEOF(padding="none", **kwargs)
 
     model.fit(v_anomaly, dim="time")
     
     if plot_out == True:
         fig = plot_EOF(model,dim=dim,EOF=True,PC=True)
+    
+    return model
+
+def HEOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x'):
+    kwargs = dict(n_modes = n_modes, use_coslat=False,random_state=1,check_nans=True)
+    # model = xe.models.ComplexEOF(padding="exp", decay_factor=0.1, **kwargs)
+    model = xe.single.HilbertEOF(padding="none", **kwargs)
+    # model = xe.models.ComplexEOF(padding="none", **kwargs)
+
+    model.fit(v_anomaly, dim="time")
+    
+    if plot_out == True:
+        expvar = model.explained_variance()
+        expvar_ratio = model.explained_variance_ratio()
+        scores = model.scores()
+        components = model.components()
+        axhdl = scores.real.plot.line(x="time", col="mode", lw=1, ylim=(-0.2, 0.2),label='real')
+        for i,ax in enumerate(axhdl.axes.flat):
+            scores.imag.isel(mode=i).plot.line(ax=ax, lw=1,label='imag')
+            ax.axhline(0,color='k',ls='--')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+        
+        vmin,vmax,levs=0,0.025,26
+        axs = model.components_amplitude().plot(x=dim,col='mode',vmin=vmin,vmax=vmax,levels=levs)
+        for i,ax in enumerate(axs.axes.flat):
+            ax.text(0.95, 0.05,f'Expl. Var.\n {(expvar_ratio * 100).round(0).values[i]:.0f}%',transform=ax.transAxes, fontsize=12,
+                     verticalalignment='bottom',horizontalalignment='right')
+            model.components_amplitude().isel(mode=i).plot.contour(ax=ax,x=dim,colors='w',linewidths=.5,
+                                                               vmin=vmin,vmax=vmax,levels=levs)
+    
+        vmin,vmax,levs=-3.6,3.6,37
+        axs = model.components_phase().plot(x=dim,col='mode',cmap="twilight",vmin=vmin,vmax=vmax,levels=levs)
+        for i,ax in enumerate(axs.axes.flat):
+            ax.text(0.95, 0.05,f'Expl. Var.\n {(expvar_ratio * 100).round(0).values[i]:.0f}%',transform=ax.transAxes, fontsize=12,
+                     verticalalignment='bottom',horizontalalignment='right')
+            model.components_phase().isel(mode=i).plot.contour(ax=ax,x=dim,colors='w',linewidths=.5,
+                                                               vmin=vmin,vmax=vmax,levels=levs)
+        plt.show()
     
     return model
 
@@ -124,14 +163,17 @@ def EOF_alpha(ds_X,ds_y):
     
     return xr.DataArray(data=lin_reg(X,y),coords=dict(mode=(ds_X.mode),time=ds_y.time))
 
-def rec_v_sec(ds_X,ds_y,glider_EOF,glider_vcur):
+def rec_v_sec(ds_X,ds_y,glider_EOF,glider_vcur,HEOF=False):
     v_rec_sec = xr.DataArray()
     for nmod in ds_X.mode.values:
         alpha = EOF_alpha(ds_X.sel(mode=slice(None,nmod)),ds_y)
 
         # reconstruction = alpha*EOF_EV + mean_glider_section
         v_rec = glider_EOF.components()*alpha+glider_vcur.mean('time')
-        v_rec = v_rec.mean('mode')
+        if HEOF:
+            v_rec = v_rec.real.mean('mode')
+        else:
+            v_rec = v_rec.mean('mode')
         v_rec['mode']=nmod
         if nmod == 1:    
             v_rec_sec = v_rec
@@ -157,7 +199,7 @@ def plot_mean_section(ds_glider,ds_q_RT,v_rec,mode_no=1,mean=False):
     ds_glider.vcur.mean(['time']).plot(x='lon',ax=ax,vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
     ax.set_title('Glider')
     ax=axs[1]
-    ds_q_RT.v_EW.mean(['TIME']).plot(x='lon_EW',ax=ax,vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+    ds_q_RT.v.mean(['TIME']).plot(x='lon',ax=ax,vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
     ax.set_title('RT EW full')
     v_EOF = v_rec.sel(mode=mode_no)
     if mean:
@@ -178,8 +220,8 @@ def plot_seasonal_cycle(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label='Glider')
 
     color='C1'
-    m = ds_q_RT.v_EW.groupby('TIME.month').mean(['TIME','lon_EW','depth']) 
-    d=ds_q_RT.v_EW.groupby('TIME.month').std('TIME').mean(['lon_EW','depth'])
+    m = ds_q_RT.v.groupby('TIME.month').mean(['TIME','lon','depth']) 
+    d=ds_q_RT.v.groupby('TIME.month').std('TIME').mean(['lon','depth'])
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label='RT EW full')
 
     v_EOF = v_rec.sel(mode=mode_no)
@@ -202,8 +244,8 @@ def plot_seasonal_cycle(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
 
 def plot_longterm(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
 
-    ds_q_RT.v_EW.sel(TIME=slice(ds_glider.time.min().values,ds_glider.time.max().values)
-                    ).mean(['lon_EW','depth']).plot.line('-',label='RT EW orig',color='C1',ax=ax)
+    ds_q_RT.v.sel(TIME=slice(ds_glider.time.min().values,ds_glider.time.max().values)
+                    ).mean(['lon','depth']).plot.line('-',label='RT EW orig',color='C1',ax=ax)
     ds_glider.vcur.mean(['lon','depth']).plot.line('-',label='glider',color='C0',ax=ax)
     v_EOF = v_rec.sel(mode=mode_no)
     if mean:

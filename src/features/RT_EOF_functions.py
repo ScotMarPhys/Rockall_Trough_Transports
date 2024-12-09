@@ -52,14 +52,14 @@ def harmonic_cycle(t, T=1, phi=0):
     """Create harmonic cycles."""
     return np.sin(2 * np.pi / T * (t + phi))
 
-def plot_EOF(model,dim,EOF=True,PC=False):
+def plot_EOF(model,dim,EOF=True,PC=False,time_dim='time'):
     expvar = model.explained_variance()
     expvar_ratio = model.explained_variance_ratio()
     scores = model.scores()
     components = model.components()
     
     if PC:
-        axhdl = scores.plot.line(x="time", col="mode", lw=1, ylim=(-0.2, 0.2))
+        axhdl = scores.plot.line(x=time_dim, col="mode", lw=1, ylim=(-0.2, 0.2))
         for i,ax in enumerate(axhdl.axes.flat):
             ax.axhline(0,color='k',ls='--')
         plt.tight_layout()
@@ -90,15 +90,15 @@ def plot_EOF(model,dim,EOF=True,PC=False):
         cb =fig.colorbar(im_hdl, cax=cbar_ax)
     return fig
 
-def EOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x'):
+def EOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x',time_dim='time'):
     kwargs = dict(n_modes = n_modes, use_coslat=False,check_nans=True)
     model = xe.single.EOF( **kwargs)
     # model = xe.models.ComplexEOF(padding="none", **kwargs)
 
-    model.fit(v_anomaly, dim="time")
+    model.fit(v_anomaly, dim=time_dim)
     
     if plot_out == True:
-        fig = plot_EOF(model,dim=dim,EOF=True,PC=True)
+        fig = plot_EOF(model,dim=dim,EOF=True,PC=True,time_dim=time_dim)
     
     return model
 
@@ -150,7 +150,7 @@ def lin_reg(X,y):
     # print(f'alpha dims: {alpha.shape}')
     return alpha
 
-def EOF_alpha(ds_X,ds_y):
+def EOF_alpha(ds_X,ds_y,time_dim='time'):
     # reshape to (depth*lon,time)
     y = np.matrix(ds_y.stack(loc=['depth','lon']).fillna(0).to_numpy()).transpose()
     # print(f'y dims: {y.shape}')
@@ -161,15 +161,15 @@ def EOF_alpha(ds_X,ds_y):
     X = np.matrix(ds_X.stack(loc=['depth','lon']).fillna(0).to_numpy()).transpose()
     # print(f'X dims: {X.shape}')
     
-    return xr.DataArray(data=lin_reg(X,y),coords=dict(mode=(ds_X.mode),time=ds_y.time))
+    return xr.DataArray(data=lin_reg(X,y),coords={'mode':(ds_X.mode),time_dim:ds_y[time_dim]})
 
-def rec_v_sec(ds_X,ds_y,glider_EOF,glider_vcur,HEOF=False):
+def rec_v_sec(ds_X,ds_y,glider_EOF,glider_vcur,HEOF=False,time_dim='time'):
     v_rec_sec = xr.DataArray()
     for nmod in ds_X.mode.values:
-        alpha = EOF_alpha(ds_X.sel(mode=slice(None,nmod)),ds_y)
+        alpha = EOF_alpha(ds_X.sel(mode=slice(None,nmod)),ds_y,time_dim=time_dim)
 
         # reconstruction = alpha*EOF_EV + mean_glider_section
-        v_rec = glider_EOF.components()*alpha+glider_vcur.mean('time')
+        v_rec = glider_EOF.components()*alpha+glider_vcur.mean(time_dim)
         if HEOF:
             v_rec = v_rec.real.mean('mode')
         else:
@@ -217,12 +217,12 @@ def plot_seasonal_cycle(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
     color='C0'
     m=ds_glider.vcur.groupby('time.month').mean(['time','lon','depth'])
     d=ds_glider.vcur.groupby('time.month').std('time').mean(['lon','depth'])
-    ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label='Glider')
+    ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label='glider')
 
     color='C1'
     m = ds_q_RT.v.groupby('TIME.month').mean(['TIME','lon','depth']) 
     d=ds_q_RT.v.groupby('TIME.month').std('TIME').mean(['lon','depth'])
-    ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label='RT EW full')
+    ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label='EW-F22')
 
     v_EOF = v_rec.sel(mode=mode_no)
     if mean:
@@ -231,14 +231,14 @@ def plot_seasonal_cycle(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
     color='C2'
     m = v_EOF.groupby('time.month').mean(['time','lon','depth']) 
     d=v_EOF.groupby('time.month').std('time').mean(['lon','depth'])
-    ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label=f'EOF {mode_no} full')
+    ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label=f'EW, EOF {mode_no} full')
 
     color='C3'
     m = v_EOF.interp(time=ds_glider.time.values
                     ).groupby('time.month').mean(['time','lon','depth'])
     d=v_EOF.interp(time=ds_glider.time.values
                     ).groupby('time.month').std('time').mean(['lon','depth'])
-    ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label=f'EOF {mode_no} resampled')
+    ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, color=color,label=f'EW, EOF {mode_no} resampled')
     ax.grid()
     ax.legend(bbox_to_anchor=(0,1.02,1,0.2),loc='lower left',mode='expand',ncol=2)
 
@@ -255,18 +255,6 @@ def plot_longterm(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
     ax.legend()
     ax.grid()
 
-def plot_transport(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
-
-    Q_moor.sel(TIME=slice(ds_glider.time.min().values,ds_glider.time.max().values)
-                    ).plot.line('-',label='RT EW orig',color='C1',ax=ax)
-    Q_glider.plot.line('-',label='glider',color='C0',ax=ax)
-    Q_rec = Q_rec.sel(mode=mode_no)
-    if mean:
-        Q_rec = Q_rec.mean('mode') 
-    Q_rec.sel(time=slice(ds_glider.time.min().values,ds_glider.time.max().values)
-              ).plot.line('-',label=f'EOF {mode_no} full',color='C2',ax=ax)
-    ax.legend(loc='upper right', bbox_to_anchor=(1.1, 1.1))
-    ax.grid()
 
 def plot_error(da_Q_obs,da_Q_rec,mode,axs):
     
@@ -275,14 +263,14 @@ def plot_error(da_Q_obs,da_Q_rec,mode,axs):
         result = scipy.stats.linregress(Q_rec,da_Q_obs)
         RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('time'))
         axs.plot(da_Q_obs,Q_rec,'.',
-             label=f'Fraser et al. (2022), \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
+             label=f'EW-F22, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
     else:
         for i in range(mode):
             Q_rec = da_Q_rec.isel(mode=i)
             result = scipy.stats.linregress(Q_rec,da_Q_obs)
             RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('time'))
             axs.plot(da_Q_obs,Q_rec,'.',
-                     label=f'{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
+                     label=f'EW, {Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
     axs.plot(np.arange(-7,11),np.arange(-7,11),color='k',lw=0.8,ls='--')
     axs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2))
     axs.set_xlabel('Observed transport')
@@ -297,13 +285,13 @@ def plot_error(da_Q_obs,da_Q_rec,mode,axs):
 def plot_transport(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
 
     Q_moor.sel(TIME=slice(Q_glider.time.min().values,Q_glider.time.max().values)
-                    ).plot.line('-',label='RT EW orig',color='C1',ax=ax)
+                    ).plot.line('-',label='EW-F22',color='C1',ax=ax)
     Q_glider.plot.line('-',label='glider',color='C0',ax=ax)
     Q_rec = Q_rec.sel(mode=mode_no)
     if mean:
         Q_rec = Q_rec.mean('mode') 
     Q_rec.sel(time=slice(Q_glider.time.min().values,Q_glider.time.max().values)
-              ).plot.line('-',label=f'EOF {mode_no} full',color='C2',ax=ax)
+              ).plot.line('-',label=f'EW, EOF {mode_no} full',color='C2',ax=ax)
     ax.legend()
     ax.grid()
 

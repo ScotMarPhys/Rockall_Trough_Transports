@@ -313,6 +313,21 @@ def prep_mooring_data_for_transport_calc(ds_RT,ds_RT_loc):
     return ds_RT
 
 #######################################
+
+def calc_sigma0_grid(ds_RT_grid):
+
+    sigma0_attrs = {'long_name':'Potential density referenced to 0dbar',
+                       'description':'Potential density TEOS-10', 
+                     'units':'kg/m^3'}
+
+    ds_RT_grid['sigma0'] = xr.apply_ufunc(gsw.sigma0,
+                      ds_RT_grid.SA,ds_RT_grid.CT,
+                      dask = 'parallelized',output_dtypes=[float,])
+    ds_RT_grid.sigma0.attrs = sigma0_attrs
+    
+    return ds_RT_grid
+
+#######################################
 def calc_SA_CT_sigma0(ds):
     
     ds = ds.rename({'TIME':'time',

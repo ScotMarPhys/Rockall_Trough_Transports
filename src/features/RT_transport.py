@@ -24,6 +24,7 @@ import src.set_paths as sps
 import src.features.RT_functions as rtf
 import src.features.RT_data as rtd
 import src.features.matfile_functions as matlab_fct
+import src.features.RT_EOF_functions as rt_eof
 
 
 # Get dx
@@ -427,7 +428,7 @@ def calc_WW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,check_plots=True):
 
     return Q_WW, q_WW.rename({'lon_WW':'lon','lat_WW':'lat'})
 ##########################
-def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots=True):
+def calc_EW_F22_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots=True):
     
     # Get section bathymetry
     lon_EW = RT_hor_grid.lon_EW
@@ -493,7 +494,7 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots
     # Add attributes
     q_EW.q.attrs={'long_name':f'Volume transport per grid cell',
             'units':'Sv',
-            'description':f'Volume transport per grid cell for RT EW'}
+            'description':f'Volume transport per grid cell for RT EW F22'}
     q_EW.v.attrs = {'long_name':'Across section velocity',
                  'units':'m/s'}
     q_EW.CT.attrs = {'long_name':'Conservative temperature',
@@ -506,12 +507,12 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots
 
     # Integrate for transport timeseries (Sv)
     Q_EW = q_EW.q.sum(['depth','lon_EW'],min_count=1)/1e6
-    Q_EW.coords['mask_EW'] = ds_RT.V_WEST_1.isel(depth=50).notnull()
+    Q_EW.coords['mask_EW'] = ds_RT.V_EAST.isel(depth=50).notnull()
     Q_EW.attrs['name']= 'RT_Q_EW'
     Q_EW.attrs['long_name']= 'RT EW Volume Transport'
     Q_EW.attrs['units']='Sv'
     Q_EW.attrs['description']='Volume transport at eastern wedge of Rockall Trough'\
-    ' derived from moored velocity measurements at RTEB1'
+    ' derived from moored velocity measurements at RTEB1 and GLORY12V1 output'
     Q_EW = Q_EW.drop_vars(['depth','PRES'])
 
     if check_plots:
@@ -524,6 +525,116 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,ds_GLORYS,check_plots
     
     return Q_EW, q_EW.rename({'lon_EW':'lon','lat_EW':'lat'})
 
+#########################
+def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,check_plots=True):
+    
+    lon_EW = RT_hor_grid.lon_EW
+    lat_EW = RT_hor_grid.lat_EW    
+    bathy_EW = ds_GEBCO.elevation.interp(
+                lon=lon_EW, lat=lat_EW
+                ).drop(['lon','lat'])
+    bathy_EW.coords['lon_EW']=lon_EW
+    bathy_EW=bathy_EW.rename({'lon_EW':'lon'})
+    
+    # Interpolate glider to EB1 depths
+    ds_glider['depth']=np.abs(ds_glider.depth)
+    ds_glider = ds_glider.interp(depth=('depth',ds_RT.depth.data)).rename({'time':'TIME'})
+    
+    # Calculate glider EOF
+    v_anomaly = ds_glider.vcur.resample(TIME="15D").mean()
+    v_anomaly = v_anomaly - v_anomaly.mean('TIME',keep_attrs=True)
+    glider_EOF = rt_eof.EOF_func(v_anomaly,n_modes=1,plot_out=False,dim='lon',time_dim='TIME')
+    
+    # Get RTEB1 meridional velocity
+    v_RTEB1=(ds_RT.V_EAST/1e2)
+    
+    #get mean glider section at mooring positions
+    glider_locs = ds_glider.vcur.sel(lon=[ds_RT_loc.lon_RTEB,ds_RT_loc.lon_RTADCP],method='nearest').mean('TIME').compute()
+    
+    # Get Glorys data at ADCP station and apply corretions
+    v_GLO_RTADCP = ds_GLORYS.vo.interp(longitude=glider_locs.lon.sel(lon=[ds_RT_loc.lon_RTADCP],method='nearest').data,
+                        latitude=ds_RT_loc.lat_RTADCP,
+                        time=('time',v_RTEB1.TIME.data),
+                        depth=('depth',v_RTEB1.depth.data)) + rtp.corr_model
+
+    # Duplicate top GLORYS-ADCP values
+    mask = v_GLO_RTADCP
+    mask = (mask.notnull()+mask.shift(depth=-1).notnull())
+    v_GLO_RTADCP = v_GLO_RTADCP.interpolate_na(dim="depth", method="nearest", fill_value="extrapolate")
+    v_GLO_RTADCP = v_GLO_RTADCP.where(mask).rename({'time':'TIME'}).squeeze().drop_vars(['latitude','longitude'])
+
+    # combinde both to one matrix (time,depth,lon)
+    ds_y = xr.concat([v_RTEB1,v_GLO_RTADCP], dim="lon")
+    ds_y['lon']=glider_locs.lon.data
+
+    # Remove glider sections temporal mean from y
+    ds_y = (ds_y-glider_locs).compute()
+
+    # get EOF components at mooring positions as X for linear regression (X'X*alpha=X'y)
+    # initial X matrix (mode,lon,depth)
+    ds_X = glider_EOF.components().sel(lon=[ds_RT_loc.lon_RTEB,ds_RT_loc.lon_RTADCP],method='nearest').compute()
+
+    # get alpha & reconstruct velocity fields
+    v_rec = rt_eof.rec_v_sec(ds_X,ds_y,glider_EOF,ds_glider.vcur,time_dim='TIME')
+    v_rec = v_rec
+    v_rec['depth']=abs(v_rec.depth)
+
+    zlim = v_rec.depth.where(v_rec.notnull()).max()
+    (v_EW,_) = xr.broadcast(ds_RT.V_EAST/100,v_rec.lon)
+    v_EW = v_rec.fillna(0)+v_EW.where(v_EW.depth>zlim).fillna(0)
+
+    # Mask bathy
+    v_EW = v_EW.where(v_EW.depth<-1*bathy_EW)
+
+
+    # Transport in each cell
+    q_EW = (RT_hor_grid.dx_EW.rename({'lon_EW':'lon'})*ds_RT.dz*(v_EW)
+           ).rename('q').to_dataset()
+    
+    #get tracer
+    mask = q_EW.q.notnull()
+    qCT = (ds_RT.TG_EAST*q_EW.q.notnull()).where(mask)
+    qSA = (ds_RT.SG_EAST*q_EW.q.notnull()).where(mask)
+    
+    q_EW['v']=v_EW
+    q_EW['CT'] = qCT
+    q_EW['SA'] = qSA
+    q_EW.coords['dx'] = RT_hor_grid.dx_EW.rename({'lon_EW':'lon'})
+    q_EW.coords['mask'] = mask
+    
+    # Add attributes
+    q_EW.q.attrs={'long_name':f'Volume transport per grid cell',
+            'units':'Sv',
+            'description':f'Volume transport per grid cell for RT EW F22'}
+    q_EW.v.attrs = {'long_name':'Across section velocity',
+                 'units':'m/s'}
+    q_EW.CT.attrs = {'long_name':'Conservative temperature',
+              'description':'conservative temperature TEOS-10',
+              'units':'degC'}
+    q_EW.SA.attrs = {'long_name':'Absolute salinity',
+            'description':'Absolute salinity TEOS-10',
+             'units':'g/kg'}
+    q_EW = q_EW.drop_vars(['mode','x'])
+
+    # Integrate for transport timeseries (Sv)
+    Q_EW = q_EW.q.sum(['depth','lon'],min_count=1)/1e6
+    Q_EW.coords['mask_EW'] = ds_RT.V_EAST.isel(depth=50).notnull()
+    Q_EW.attrs['name']= 'RT_Q_EW'
+    Q_EW.attrs['long_name']= 'RT EW Volume Transport'
+    Q_EW.attrs['units']='Sv'
+    Q_EW.attrs['description']='Volume transport at eastern wedge of Rockall Trough'\
+    ' derived from moored velocity measurements at RTEB1, GLORY12V1 output and glider data'
+    Q_EW = Q_EW.drop_vars(['depth','PRES'])
+    
+    if check_plots:
+        fig,axs=plt.subplots(1,1,figsize=[6,4])
+        Q_EW.plot()
+        axs.grid()
+        axs.set_title(Q_EW.long_name)
+        axs.set_ylabel('Volume \nTransport (Sv)')
+        fig.tight_layout()
+   
+    return Q_EW,q_EW
 #########################
 
 def combine_sections_tot_transp(ds_Q_WW,ds_Q_MB,ds_Q_EW):

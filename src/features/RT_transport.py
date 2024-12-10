@@ -576,11 +576,10 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
 
     # get alpha & reconstruct velocity fields
     v_rec = rt_eof.rec_v_sec(ds_X,ds_y,glider_EOF,ds_glider.vcur,time_dim='TIME')
-    v_rec = v_rec
     v_rec['depth']=abs(v_rec.depth)
 
     zlim = v_rec.depth.where(v_rec.notnull()).max()
-    (v_EW,_) = xr.broadcast(ds_RT.V_EAST/100,v_rec.lon)
+    (v_EW,_) = xr.broadcast(v_RTEB1,v_rec.lon)
     v_EW = v_rec.fillna(0)+v_EW.where(v_EW.depth>zlim).fillna(0)
 
     # Mask bathy
@@ -634,7 +633,8 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
         axs.set_ylabel('Volume \nTransport (Sv)')
         fig.tight_layout()
    
-    return Q_EW,q_EW
+    return Q_EW,q_EW,ds_glider
+    
 #########################
 
 def combine_sections_tot_transp(ds_Q_WW,ds_Q_MB,ds_Q_EW):

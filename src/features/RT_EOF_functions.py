@@ -103,7 +103,7 @@ def EOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x',time_dim='time'):
     return model
 
 def HEOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x'):
-    kwargs = dict(n_modes = n_modes, use_coslat=False,random_state=1,check_nans=True)
+    kwargs = dict(use_coslat=False,random_state=1,check_nans=True)
     # model = xe.models.ComplexEOF(padding="exp", decay_factor=0.1, **kwargs)
     model = xe.single.HilbertEOF(padding="none", **kwargs)
     # model = xe.models.ComplexEOF(padding="none", **kwargs)
@@ -155,8 +155,9 @@ def EOF_alpha(ds_X,ds_y,time_dim='time'):
     y = np.matrix(ds_y.stack(loc=['depth','lon']).fillna(0).to_numpy()).transpose()
     # print(f'y dims: {y.shape}')
 
-    ds_X['depth']=np.abs(ds_X.depth)
-    ds_X = ds_X.reindex(depth=list(reversed(ds_X.depth)))
+    if ds_X.depth.mean('depth')<0:
+        ds_X['depth']=np.abs(ds_X.depth)
+        ds_X = ds_X.reindex(depth=list(reversed(ds_X.depth)))
     # reshape dimension (depth*lon,mode)
     X = np.matrix(ds_X.stack(loc=['depth','lon']).fillna(0).to_numpy()).transpose()
     # print(f'X dims: {X.shape}')

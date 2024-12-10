@@ -328,6 +328,21 @@ def calc_sigma0_grid(ds_RT_grid):
     return ds_RT_grid
 
 #######################################
+
+def calc_sigma0(ds):
+    
+    sigma0_attrs = {'long_name':'Potential density referenced to 0dbar',
+                   'description':'Potential density TEOS-10', 
+                 'units':'kg/m^3'}
+    
+    ds['sigma0'] = xr.apply_ufunc(gsw.sigma0,
+                  ds.SA,ds.CT,
+                  dask = 'parallelized',output_dtypes=[float,])
+    ds.sigma0.attrs = sigma0_attrs
+    return ds
+
+
+
 def calc_SA_CT_sigma0(ds):
     
     ds = ds.rename({'TIME':'time',

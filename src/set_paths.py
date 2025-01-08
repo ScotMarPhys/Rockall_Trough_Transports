@@ -34,6 +34,6 @@ GLORYS_fn_re = list(sorted(
 GLORYS_fn_an = list(sorted(
         (GLORYS_data_path).glob(f"*anfc-phy-001_024_Vvel.nc") # analysis/forecasts
     ))
-ERA5_fn = 'ERA5_tauxy_RT_2014-2022.nc' 
+ERA5_fn = 'ERA5_mm_mean_tauxy_RT_2014_2024.nc' 
 NAO_fn = 'NAO_Barnston_1987_daily_1950_2023.csv'
 EAP_fn = 'data.nc'

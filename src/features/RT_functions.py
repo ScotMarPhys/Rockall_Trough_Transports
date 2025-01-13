@@ -592,7 +592,7 @@ def detrend_data(ds,dim):
     rsq_y = 1 - yresid/ytotal*(len(ds)-1)/(len(ds)-2);
 
     # calculate t-value
-    t_val = np.sqrt((rsq_y*(dof-2))/(1-rsq_y));
+    t_val = np.sqrt(abs((rsq_y*(dof-2))/(1-rsq_y)));
 
     # significance test, t-test, 95% interval, H_0: R=0.0
     if abs(t_crit)<abs(t_val):

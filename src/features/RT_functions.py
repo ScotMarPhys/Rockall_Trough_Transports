@@ -560,25 +560,86 @@ def decorrelation(x,y,dim,doplot,precision=2,print_text=False):
     return dcl,dof
     
 ###########################################################################
-def detrend_data(ds,dim):
-   
-    # # remove annual and semiannual harmonic
-    # ds_HF = harm_fit(ds,dims=dims)
-    # ds_AH = reconstr_ts(ds_HF,ds[dims].values,365,dims=dims)
-    # ds_SH = reconstr_ts(ds_HF,ds[dims].values,365/2,dims=dims)
-    # ds_no_cyc = ds-ds_AH-ds_SH
+def harmonic_cycle(t, T=1, phi=0):
+    """Create harmonic cycles."""
+    return np.sin(2 * np.pi / T * (t + phi))
+
+def normalize(x=None, y=None):
+    return y / np.linalg.norm(y) / (x.max() - x.min()) ** 0.5
+
+def harmonic_proj(t=None, T=None, dt=None, signal=None, dims='time'):
+    #     harmonic_mode = (
+    #         normalize(t, harmonic_cycle(t, T=T, phi=0))
+    #         + 1j * normalize(t, harmonic_cycle(t, T=T, phi=T / 4.0))
+    #     ) / (2 ** 0.5)
+    harmonic_mode = normalize(
+        t,
+        harmonic_cycle(t, T=T, phi=0) + 1j * harmonic_cycle(t, T=T, phi=T / 4.0)
+    )
+    return (signal * xr.DataArray(harmonic_mode, dims=dims)* dt**0.5).sum(dims)
+
+def harmonic_phase(t=None, T=None, dt=None, signal=None, dims='time'):
+    proj = harmonic_proj(t=t, T=T, dt=dt, signal=signal, dims=dims)
+    phi = np.arctan2(np.imag(proj), np.real(proj)) * T / np.pi / 2
+    phi.attrs['name'] = 'Phase'
+    phi.attrs['units'] = 'days'
+    return phi
+
+def harmonic_amplitude(t=None, T=None, dt=None, signal=None, dims='time'):
+    proj = harmonic_proj(t=t, T=T, dt=dt, signal=signal, dims=dims)
+    return 2 * np.abs(proj)
+
+def harm_fit(s_n,dims='time'):
+    time_ordinal = np.array([pd.to_datetime(x).toordinal() for x in s_n[dims].values])
+    time_ordinal -= time_ordinal[0]
+    s_n.coords['time_ordinal']=([dims],time_ordinal)
+    dt = time_ordinal[1]-time_ordinal[0]
+
+    ah_pha = harmonic_phase(s_n.time_ordinal, 365,dt, s_n, dims=dims)
+    ah_amp = harmonic_amplitude(s_n.time_ordinal, 365,dt, s_n, dims=dims)
+    sh_pha = harmonic_phase(time_ordinal, 365 / 2.0,dt, s_n, dims=dims)
+    sh_amp = harmonic_amplitude(time_ordinal, 365 / 2.0,dt, s_n, dims=dims)
+    return xr.merge((ah_pha.rename('ah_pha'), ah_amp.rename('ah_amp'), sh_pha.rename('sh_pha'), sh_amp.rename('sh_amp')))
+
+def reconstr_ts(harmo_JRA_obs,time,T,dims='time'):
+    t = np.array([pd.to_datetime(x).toordinal() for x in time])
+    t -= t[0]
+    t=xr.DataArray(data=t,dims=dims)
+    if T==365:
+        amp,phi = harmo_JRA_obs.ah_amp,harmo_JRA_obs.ah_pha
+    elif T==365/2:
+        amp,phi = harmo_JRA_obs.sh_amp,harmo_JRA_obs.sh_pha
     
-    ds = ds - ds.mean(dim)
-    
+    JRA_rec = amp * harmonic_cycle(
+        t, T=T, phi=phi)
+    JRA_rec.coords[dims]=time
+    return JRA_rec
+
+def detrend_data(ds,dim,perform_HF=False,plot=False):
+
+    ds_orig = ds
+    date_1yr = '%4d-%02d-%02d'%((ds[dim][0].dt.year+1).values,ds[dim][0].dt.month.values,ds[dim][0].dt.day.values)
+    date_1yr = np.datetime64(date_1yr,'ns')
+    date_1yr = xr.DataArray(np.array([ds[dim][0].values, date_1yr], dtype='datetime64'),dims=dim)
+    date_1yr.coords[dim]=date_1yr
+
+    # remove annual and semiannual harmonic
+    if perform_HF:
+        ds_HF = harm_fit(ds,dims=dim)
+        ds_AH = reconstr_ts(ds_HF,ds[dim].values,365,dims=dim)
+        ds_SH = reconstr_ts(ds_HF,ds[dim].values,365/2,dims=dim)
+        ds = ds-ds_AH-ds_SH
+
     p = ds.polyfit(dim=dim, deg=1)
     fit = xr.polyval(ds[dim], p.polyfit_coefficients)
+    # fit = fit-2*fit[0]
+    trend_1yr = xr.polyval(date_1yr, p.polyfit_coefficients)
+    trend_1yr = trend_1yr.diff(dim).values
 
-
-    ## SIGNIFICANCE TEST
+    # ## SIGNIFICANCE TEST
 
     # calculate degrees of freedom (dof)
     _,dof = decorrelation(ds.fillna(0),ds.fillna(0),'TIME',0);
-
 
     #find T critical value
     alpha =  1-0.05/2; # two-sided t-test
@@ -599,30 +660,46 @@ def detrend_data(ds,dim):
         trend_significant = True
     else:
         trend_significant = False
-    
+
     slope=(p.polyfit_coefficients.sel(degree=1).values)
     intc=(p.polyfit_coefficients.sel(degree=0).values)
-    
-    # print(f'Trend of {slope} is significant: {}')
-    #         ds_trnd=([dim],fit),
-    #         INT_dtnd=([dim],ds-fit+ds.mean(dim)),
-    #         INT_trnd_signf=(trend_significant),
+
+    ds_detrend = xr.Dataset(data_vars=dict(
+            ds_orig=([dim],ds_orig.values),
+            reg_slope=(p.polyfit_coefficients.sel(degree=1).values),
+            reg_intc=(p.polyfit_coefficients.sel(degree=0).values),
+            trend_1yr=(trend_1yr),
+            ds_trend=([dim],(fit).data),
+            ds_dtrnd=([dim],(ds-(fit-fit.mean(dim))).values),
+            trend_sign=(trend_significant),
+        ),
+        coords={dim:ds[dim].values},
+        )
+    ds_detrend.ds_orig.attrs=ds_orig.attrs
+    ds_detrend.ds_dtrnd.attrs=ds_orig.attrs
+    ds_detrend.ds_trend.attrs=ds_orig.attrs
+    ds_detrend.ds_trend.attrs['description']='trend fitted to ds_orig'
+    ds_detrend.ds_trend.attrs['description']='(ds_trend-ds_trend.mean()) subtracted from ds_orig'
+
+    if plot:
+        fs=8
+        font = {'weight' : 'normal',
+                'size'   : fs}
+        plt.rc('font', **font)
         
-#     top_int,bot_int = regression_line_ci(0.05,
-#                                          p.polyfit_coefficients.sel(degree=1).values,
-#                                          p.polyfit_coefficients.sel(degree=0).values,
-#                                          ds,dims)
-    
-    # ds_detrend = xr.Dataset(data_vars=dict(
-    #         ds_orig=([dim],ds),
-    #         ds_reg_slope=(p.polyfit_coefficients.sel(degree=1).values),
-    #         ds_reg_intc=(p.polyfit_coefficients.sel(degree=0).values),
-    #         ds_trnd=([dim],fit),
-    #         INT_dtnd=([dim],ds-fit+ds.mean(dim)),
-    #         INT_trnd_signf=(trend_significant),
-    #     ),
-    #     coords=dict(TIME=ds[dim].values),
-    #     )
+        fig,axs = plt.subplots(1,1,figsize=[5,1.5])
+        ax=axs
+        ds_detrend.ds_orig.plot.line(ax=ax,lw=0.5,label='orig')
+        ds_detrend.ds_dtrnd.plot.line(ax=ax,lw=0.5,label='detrended')
+        (fit-fit[0]+intc).plot(ax=ax,label='trend')
+        ax.hlines(ds.mean(dim),ds[dim][0],ds[dim][-1])
+        left,bottom=0.95,0.05
+        if abs(trend_1yr)<1e-2:
+            ax.text(left,bottom,'trend is %3.2f 10$^{-2}$ %s/yr, signifcance - %s'%(trend_1yr*1e2,ds_orig.units,trend_significant),ha='right',transform=ax.transAxes,fontsize=fs)
+        else:
+            ax.text(left,bottom,'trend is %3.2f %s/yr, signifcance - %s'%(trend_1yr,ds_orig.units,trend_significant),ha='right',transform=ax.transAxes,fontsize=fs)
+        plt.legend(ncol=3,loc='upper right',fontsize=fs)
+        ax.set_ylabel('%s [%s]'%(ds_orig.long_name,ds_orig.units))
 
     return fit, slope, intc, trend_significant
 

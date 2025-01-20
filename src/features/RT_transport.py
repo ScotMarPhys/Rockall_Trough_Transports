@@ -156,24 +156,24 @@ def calc_MB_transport(ds_RT,ds_RT_loc,sens_analysis=True,check_plots=True):
         (ds_RT_ave,_) = xr.broadcast(ds_RT.mean('TIME'),ds_RT.TIME)
 
         # % Do it again isolating CT changes/ keeping SA fixed
-        SF_RTWB_SAfix = gsw_geo_strf_dyn_height(ds_RT.SG_WEST,ds_RT_ave.TG_WEST,ds_RT.PRES,P_ref)
-        SF_RTEB_SAfix = gsw_geo_strf_dyn_height(ds_RT.SG_EAST,ds_RT_ave.TG_EAST,ds_RT.PRES,P_ref)
+        SF_RTWB_SAfix = gsw_geo_strf_dyn_height(ds_RT_ave.SG_WEST,ds_RT.TG_WEST,ds_RT.PRES,P_ref)
+        SF_RTEB_SAfix = gsw_geo_strf_dyn_height(ds_RT_ave.SG_EAST,ds_RT.TG_EAST,ds_RT.PRES,P_ref)
         q_MB_SAfix = ds_RT.dz*((SF_RTEB_SAfix - SF_RTWB_SAfix)/f)
         Q_MB_SAfix = q_MB_SAfix.sum('depth',min_count=1)/1e6
         Q_MB_SAfix.attrs['name']= 'RT_Q_MB_SAfix'
-        Q_MB_SAfix.attrs['long_name']= 'RT MB Volume Transport CT fixed'
+        Q_MB_SAfix.attrs['long_name']= 'RT MB Volume Transport SA fixed'
         Q_MB_SAfix.attrs['units']='Sv'
-        Q_MB_SAfix.attrs['description']='As Q_MB but holding temperature fixed at temporal mean at all moorings'
+        Q_MB_SAfix.attrs['description']='As Q_MB but holding salinity fixed at temporal mean at all moorings'
 
         # % Do it again isolating SA changes / keeping CT fixed
-        SF_RTWB_CTfix = gsw_geo_strf_dyn_height(ds_RT_ave.SG_WEST,ds_RT.TG_WEST,ds_RT.PRES,P_ref)
-        SF_RTEB_CTfix = gsw_geo_strf_dyn_height(ds_RT_ave.SG_EAST,ds_RT.TG_EAST,ds_RT.PRES,P_ref)
+        SF_RTWB_CTfix = gsw_geo_strf_dyn_height(ds_RT.SG_WEST,ds_RT_ave.TG_WEST,ds_RT.PRES,P_ref)
+        SF_RTEB_CTfix = gsw_geo_strf_dyn_height(ds_RT.SG_EAST,ds_RT_ave.TG_EAST,ds_RT.PRES,P_ref)
         q_MB_CTfix = ds_RT.dz*((SF_RTEB_CTfix - SF_RTWB_CTfix)/f)
         Q_MB_CTfix = q_MB_CTfix.sum('depth',min_count=1)/1e6
         Q_MB_CTfix.attrs['name']= 'RT_Q_MB_CTfix'
-        Q_MB_CTfix.attrs['long_name']= 'RT MB Volume Transport SA fixed'
+        Q_MB_CTfix.attrs['long_name']= 'RT MB Volume Transport CT fixed'
         Q_MB_CTfix.attrs['units']='Sv'
-        Q_MB_CTfix.attrs['description']= 'As Q_MB but holding salinity fixed at temporal mean at all moorings'
+        Q_MB_CTfix.attrs['description']= 'As Q_MB but holding temperature fixed at temporal mean at all moorings'
 
         # % Do it again holding both fixed
         SF_RTWB_SAfix_CTfix = gsw_geo_strf_dyn_height(ds_RT_ave.SG_WEST,ds_RT_ave.TG_WEST,ds_RT.PRES,P_ref)
@@ -185,7 +185,7 @@ def calc_MB_transport(ds_RT,ds_RT_loc,sens_analysis=True,check_plots=True):
         Q_MB_SAfix_CTfix.attrs['units']='Sv'
         Q_MB_SAfix_CTfix.attrs['description']= 'As Q_MB but holding temperature and salinity fixed at temporal mean at all moorings'
 
-        # % Do it again isolating CT_RTWB
+        # % Do it again isolating CT_RTWB        
         q_MB_WB_CTvar = ds_RT.dz*((SF_RTEB_SAfix_CTfix - SF_RTWB_SAfix)/f)
         Q_MB_WB_CTvar = q_MB_WB_CTvar.sum('depth',min_count=1)/1e6
         Q_MB_WB_CTvar.attrs['name']= 'RT_Q_MB_WB_CTvar'

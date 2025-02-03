@@ -384,3 +384,100 @@ def plot_RT_mean_sections_from_mooring(ds_q_RT,ds_RT_loc):
         ax.set_ylim([2300,0])
         
     return fig
+
+###########################################################################################
+def plot_EOF_HEOF(model_EOF,model_HEOF,ds_RT_loc,dim,TIME_dim='TIME'):
+    fs = 18
+    font = {'weight' : 'normal',
+        'size'   : fs}
+    plt.rc('font', **font)
+    
+    xticks_EW = np.arange(-9.5,ds_RT_loc.lon_RTES,.1)
+    xticklabels_EW = ['9.5°W','9.4°W','9.3°W','9.2°W']
+
+    expvar = model_EOF.explained_variance()
+    expvar_ratio = model_EOF.explained_variance_ratio()
+    components = model_EOF.components()
+    
+    expvar_HEOF = model_HEOF.explained_variance()
+    expvar_ratio_HEOF = model_HEOF.explained_variance_ratio()
+    amp = model_HEOF.components_amplitude()
+    phase = model_HEOF.components_phase()
+
+    fig,axs = plt.subplots(3,components.mode.size,
+                           figsize=[15,4*3],sharey=True,sharex=True)
+    vmin,vmax,levs=-0.02,0.02,21
+   
+    for i,ax in enumerate(axs[0,:]):
+        im_hdl = components.isel(mode=i).plot(x=dim,ax=ax,add_colorbar=False,
+                    vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r',yincrease=False)
+
+        ax.text(0.95, 0.05,f'EOF \nExpl. Var.\n {(expvar_ratio * 100).round(0).values[i]:.0f}%',
+                transform=ax.transAxes, fontsize=fs,
+                 verticalalignment='bottom',horizontalalignment='right')
+        components.isel(mode=i).plot.contour(ax=ax,x=dim,colors='w',linewidths=.5,yincrease=False,
+                                                           vmin=vmin,vmax=vmax,levels=levs)
+        
+        ax.set_title(f'mode = {i+1}', fontsize=fs)
+        if i>0:
+            ax.set_ylabel('')
+        else:
+            ax.set_ylabel('Depth [m]', fontsize=fs)         
+            
+    vmin,vmax,levs=0,0.025,26
+    for i,ax in enumerate(axs[1,:]):
+        im_amp = amp.isel(mode=i).plot(x=dim,ax=ax,add_colorbar=False,
+                                       vmin=vmin,vmax=vmax,levels=levs,yincrease=False)
+        ax.text(0.95, 0.05,f'HEOF\n Expl. Var.\n {(expvar_ratio_HEOF * 100).round(0).values[i]:.0f}%',
+                            transform=ax.transAxes, fontsize=fs,
+                            verticalalignment='bottom',horizontalalignment='right')
+        amp.isel(mode=i).plot.contour(ax=ax,x=dim,colors='w',linewidths=.5,yincrease=False,
+                                                           vmin=vmin,vmax=vmax,levels=levs)
+        ax.set_title('')
+        if i>0:
+            ax.set_ylabel('') 
+        else:
+            ax.set_ylabel('Depth [m]')
+            
+    vmin,vmax,levs=-3.6,3.6,37
+    for i,ax in enumerate(axs[2,:]):
+        im_pha = phase.isel(mode=i).plot(x=dim,ax=ax,add_colorbar=False,cmap="twilight",
+                                       vmin=vmin,vmax=vmax,levels=levs,yincrease=False)
+        ax.text(0.95, 0.05,f'HEOF\n Expl. Var.\n {(expvar_ratio_HEOF * 100).round(0).values[i]:.0f}%',
+                            transform=ax.transAxes, fontsize=fs,
+                            verticalalignment='bottom',horizontalalignment='right')
+        phase.isel(mode=i).plot.contour(ax=ax,x=dim,colors='w',linewidths=.5,yincrease=False,
+                                                           vmin=vmin,vmax=vmax,levels=levs) 
+        ax.set_title('')
+        if i>0:
+            ax.set_ylabel('')
+        else:
+            ax.set_ylabel('Depth [m]')
+
+   
+    for ax in axs.flat:
+            ax.grid()
+            ax.set_xlabel('')
+            ax.set_xlim([ds_RT_loc.lon_RTEB-0.01,ds_RT_loc.lon_RTES+0.01])
+            ax.set_xticks(xticks_EW)
+            ax.set_xticklabels(xticklabels_EW,fontsize=fs)
+    
+    for i, label in enumerate(('a)', 'b)','c)','d)','e)','f)','g)','h)','i)')):
+        ax =  axs.flat[i]
+        ax.text(0.05, 1.02, label, transform=ax.transAxes,
+          fontsize=fs, ha='left',va='bottom')
+    
+    plt.tight_layout()
+    fig.subplots_adjust(right=0.90)
+    cbar_ax = fig.add_axes([0.92, 0.7, 0.02, 0.25])
+    cb =fig.colorbar(im_hdl, cax=cbar_ax)
+    cb.ax.set_ylabel('amplitude')
+    
+    cbar_ax = fig.add_axes([0.92, 0.37, 0.02, 0.25])
+    cb =fig.colorbar(im_amp, cax=cbar_ax)
+    cb.ax.set_ylabel('amplitude')
+    
+    cbar_ax = fig.add_axes([0.92, 0.07, 0.02, 0.25])
+    cb =fig.colorbar(im_pha, cax=cbar_ax)
+    cb.ax.set_ylabel('phase')
+    return fig

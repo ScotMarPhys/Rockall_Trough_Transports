@@ -71,6 +71,7 @@ def plot_EOF(model,dim,EOF=True,PC=False,TIME_dim='TIME'):
         font = {'weight' : 'normal',
                 'size'   : fs}
         plt.rc('font', **font)
+        
         fig,axs = plt.subplots(1,components.mode.size,figsize=[12,4],sharey=True)
         vmin,vmax,levs=-0.02,0.02,21
         for i,ax in enumerate(axs):
@@ -103,13 +104,13 @@ def EOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x',TIME_dim='TIME'):
     
     return model
 
-def HEOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x'):
-    kwargs = dict(use_coslat=False,random_state=1,check_nans=True)
+def HEOF_func(v_anomaly,n_modes=2,plot_out=True,dim='x',TIME_dim='TIME'):
+    kwargs = dict(n_modes = n_modes,use_coslat=False,random_state=1,check_nans=True)
     # model = xe.models.ComplexEOF(padding="exp", decay_factor=0.1, **kwargs)
     model = xe.single.HilbertEOF(padding="none", **kwargs)
     # model = xe.models.ComplexEOF(padding="none", **kwargs)
 
-    model.fit(v_anomaly, dim="TIME")
+    model.fit(v_anomaly, dim=TIME_dim)
     
     if plot_out == True:
         expvar = model.explained_variance()
@@ -125,7 +126,8 @@ def HEOF_func(v_anomaly,n_modes=4,plot_out=True,dim='x'):
         plt.show()
         
         vmin,vmax,levs=0,0.025,26
-        axs = model.components_amplitude().plot(x=dim,col='mode',vmin=vmin,vmax=vmax,levels=levs,yincrease=False)
+        axs = model.components_amplitude(
+        ).plot(x=dim,col='mode',vmin=vmin,vmax=vmax,levels=levs,yincrease=False)
         for i,ax in enumerate(axs.axes.flat):
             ax.text(0.95, 0.05,f'Expl. Var.\n {(expvar_ratio * 100).round(0).values[i]:.0f}%',transform=ax.transAxes, fontsize=12,
                      verticalalignment='bottom',horizontalalignment='right')

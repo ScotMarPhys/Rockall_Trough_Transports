@@ -6,34 +6,34 @@ import xeofs as xe
 from matplotlib import pyplot as plt
 import src.features.RT_transport as rtt
 
-def add_nan_glider_sections(ds_glider):
+def add_nan_glider_sections(ds_glider,dim='time'):
     t1=np.datetime64('2020-09-01', 'ns')
     t2=np.datetime64('2021-03-01', 'ns')
     t3=np.datetime64('2021-09-01', 'ns')
     t4=np.datetime64('2022-03-01', 'ns')
     t5=np.datetime64('2022-06-01', 'ns')
     t6=np.datetime64('2022-10-01', 'ns')
-    dummy1=ds_glider.isel(time=0)*np.nan
-    dummy1['time']=t1
-    dummy2=ds_glider.isel(time=0)*np.nan
-    dummy2['time']=t2
-    dummy3=ds_glider.isel(time=0)*np.nan
-    dummy3['time']=t3
-    dummy4=ds_glider.isel(time=0)*np.nan
-    dummy4['time']=t4
-    dummy5=ds_glider.isel(time=0)*np.nan
-    dummy5['time']=t5
-    dummy6=ds_glider.isel(time=0)*np.nan
-    dummy6['time']=t6
-    ds_glider_nan = xr.concat([ds_glider.sel(time=slice(None,t1)),dummy1,
-                              ds_glider.sel(time=slice(t1,t2)),dummy2,
-                              ds_glider.sel(time=slice(t2,t3)),dummy3,
-                              ds_glider.sel(time=slice(t3,t4)),dummy4,
-                              ds_glider.sel(time=slice(t4,t5)),dummy5,
-                              ds_glider.sel(time=slice(t5,t6)),dummy6,
-                              ds_glider.sel(time=slice(t6,None)),
+    dummy1=ds_glider.isel({dim:0})*np.nan
+    dummy1[dim]=t1
+    dummy2=ds_glider.isel({dim:0})*np.nan
+    dummy2[dim]=t2
+    dummy3=ds_glider.isel({dim:0})*np.nan
+    dummy3[dim]=t3
+    dummy4=ds_glider.isel({dim:0})*np.nan
+    dummy4[dim]=t4
+    dummy5=ds_glider.isel({dim:0})*np.nan
+    dummy5[dim]=t5
+    dummy6=ds_glider.isel({dim:0})*np.nan
+    dummy6[dim]=t6
+    ds_glider_nan = xr.concat([ds_glider.sel({dim:slice(None,t1)}),dummy1,
+                              ds_glider.sel({dim:slice(t1,t2)}),dummy2,
+                              ds_glider.sel({dim:slice(t2,t3)}),dummy3,
+                              ds_glider.sel({dim:slice(t3,t4)}),dummy4,
+                              ds_glider.sel({dim:slice(t4,t5)}),dummy5,
+                              ds_glider.sel({dim:slice(t5,t6)}),dummy6,
+                              ds_glider.sel({dim:slice(t6,None)}),
                               ],
-                             dim='time')
+                             dim=dim)
     return ds_glider_nan
 
 def normalize(x=None, y=None):
@@ -169,18 +169,18 @@ def rec_v_sec(ds_X,ds_y,glider_EOF,glider_vcur,HEOF=False,TIME_dim='TIME'):
     v_rec_sec = xr.DataArray()
     for nmod in ds_X.mode.values:
         alpha = EOF_alpha(ds_X.sel(mode=slice(None,nmod)),ds_y,TIME_dim=TIME_dim)
-
+        
         # reconstruction = alpha*EOF_EV + mean_glider_section
-        v_rec = glider_EOF.components()*alpha
+        v_rec = glider_EOF.components().sel(mode=slice(None,nmod))*alpha
         if HEOF:
-            v_rec = v_rec.real.sum('mode')
+            v_rec = v_rec.real.sum('mode')+glider_vcur.mean(TIME_dim)
         else:
-            v_rec = v_rec.sum('mode')
+            v_rec = v_rec.sum('mode')+glider_vcur.mean(TIME_dim)
         v_rec['mode']=nmod
         if nmod == 1:    
-            v_rec_sec = v_rec +glider_vcur.mean(TIME_dim)
+            v_rec_sec = v_rec 
         else:
-            v_rec_sec = xr.concat([v_rec_sec,v_rec+glider_vcur.mean(TIME_dim)],dim='mode')
+            v_rec_sec = xr.concat([v_rec_sec,v_rec],dim='mode')
     v_rec_sec['lat']=('lon',v_rec_sec.lat.isel(depth=0).values)
     return v_rec_sec
 
@@ -198,20 +198,24 @@ def plot_mean_section(ds_glider,ds_q_RT,v_rec,mode_no=1,mean=False):
     fig,axs = plt.subplots(1,4,figsize=[15,3])
     vmin,vmax,levs=-0.2,0.2,41
     ax=axs[0]
-    ds_glider.vcur.mean(['TIME']).plot(x='lon',ax=ax,vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+    ds_glider.vcur.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
+                                       vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
     ax.set_title('Glider')
     ax=axs[1]
-    ds_q_RT.v.mean(['TIME']).plot(x='lon',ax=ax,vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+    ds_q_RT.v.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
+                                  vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
     ax.set_title('RT EW full')
     v_EOF = v_rec.sel(mode=mode_no)
     if mean:
         v_EOF = v_EOF.mean('mode')        
     ax=axs[2]
-    v_EOF.mean('TIME').plot(x='lon',ax=ax,vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+    v_EOF.mean('TIME').plot(x='lon',ax=ax,yincrease=False,
+                            vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
     ax.set_title(f'EOF {mode_no} full')
     ax=axs[3]
     v_EOF.interp(TIME=ds_glider.TIME.values
-                    ).mean(['TIME']).plot(x='lon',ax=ax,vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+                    ).mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
+                                          vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
     ax.set_title(f'EOF {mode_no} resampled')
     plt.tight_layout()
 

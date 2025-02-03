@@ -549,10 +549,12 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
     v_RTEB1=(ds_RT.V_EAST/1e2)
     
     #get mean glider section at mooring positions
-    glider_locs = ds_glider.vcur.sel(lon=[ds_RT_loc.lon_RTEB,ds_RT_loc.lon_RTADCP],method='nearest').mean('TIME').compute()
+    glider_locs = ds_glider.vcur.sel(lon=[ds_RT_loc.lon_RTEB,ds_RT_loc.lon_RTADCP],method='nearest'
+                                    ).mean('TIME').compute()
     
     # Get Glorys data at ADCP station and apply corretions
-    v_GLO_RTADCP = ds_GLORYS.vo.interp(longitude=glider_locs.lon.sel(lon=[ds_RT_loc.lon_RTADCP],method='nearest').data,
+    v_GLO_RTADCP = ds_GLORYS.vo.interp(longitude=glider_locs.lon.sel(
+                        lon=[ds_RT_loc.lon_RTADCP],method='nearest').data,
                         latitude=ds_RT_loc.lat_RTADCP,
                         time=('time',v_RTEB1.TIME.data),
                         depth=('depth',v_RTEB1.depth.data)) + rtp.corr_model
@@ -561,7 +563,8 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
     mask = v_GLO_RTADCP
     mask = (mask.notnull()+mask.shift(depth=-1).notnull())
     v_GLO_RTADCP = v_GLO_RTADCP.interpolate_na(dim="depth", method="nearest", fill_value="extrapolate")
-    v_GLO_RTADCP = v_GLO_RTADCP.where(mask).rename({'time':'TIME'}).squeeze().drop_vars(['latitude','longitude'])
+    v_GLO_RTADCP = v_GLO_RTADCP.where(mask).rename({'time':'TIME'}).squeeze(
+                    ).drop_vars(['latitude','longitude'])
 
     # combinde both to one matrix (time,depth,lon)
     ds_y = xr.concat([v_RTEB1,v_GLO_RTADCP], dim="lon")
@@ -572,14 +575,17 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
 
     # get EOF components at mooring positions as X for linear regression (X'X*alpha=X'y)
     # initial X matrix (mode,lon,depth)
-    ds_X = glider_EOF.components().sel(lon=[ds_RT_loc.lon_RTEB,ds_RT_loc.lon_RTADCP],method='nearest').compute()
+    ds_X = glider_EOF.components().sel(lon=[ds_RT_loc.lon_RTEB,ds_RT_loc.lon_RTADCP],
+                                       method='nearest').compute()
 
     # get alpha & reconstruct velocity fields
     v_rec = rt_eof.rec_v_sec(ds_X,ds_y,glider_EOF,ds_glider.vcur,time_dim='TIME')
-    v_rec['depth']=abs(v_rec.depth)
+    v_rec.plot()
 
     zlim = v_rec.depth.where(v_rec.notnull()).max()
     (v_EW,_) = xr.broadcast(v_RTEB1,v_rec.lon)
+
+    
     v_EW = v_rec.fillna(0)+v_EW.where(v_EW.depth>zlim).fillna(0)
 
     # Mask bathy

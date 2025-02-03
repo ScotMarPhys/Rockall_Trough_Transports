@@ -6,7 +6,6 @@ import scipy.io
 import cmocean as cm
 import numpy as np
 import pandas as pd
-import seawater as sw
 import scipy.signal as signal
 import palettable.colorbrewer as cb
 import xarray as xr
@@ -366,7 +365,7 @@ def calc_SA_CT_sigma0(ds):
                  'units':'kg/m^3'}
     # calculate pressure
     ds['PRES'] = xr.apply_ufunc(
-        sw.eos80.pres,
+        gsw.p_from_z,
         -abs(ds.psal.depth),ds.lat,
         dask='parallelized', output_dtypes=[float, ]
         )

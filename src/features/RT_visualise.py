@@ -45,14 +45,15 @@ def plot_figure_gap(v_merge,y_pred,py_str,y_pred_lp,py_lp_str,period=[None,None]
             ax.set_title('')
             ax.grid()
             
-def plot_extr_patch(ds1,ax):
+def plot_extr_patch(ds1,ax,plot_mean=True):
     th_p = ds1.mean()+ds1.std()
     th_m = ds1.mean()-ds1.std()
     ylim = ax.get_ylim()
     
-    ax.hlines(ds1.mean(),ds1.TIME.min(),ds1.TIME.max(),color='r',lw=0.5)
-    ax.hlines(ds1.mean()+ds1.std(),ds1.TIME.min(),ds1.TIME.max(),color='r',lw=0.5,ls='--')
-    ax.hlines(ds1.mean()-ds1.std(),ds1.TIME.min(),ds1.TIME.max(),color='r',lw=0.5,ls='--')
+    if plot_mean:
+        ax.hlines(ds1.mean(),ds1.TIME.min(),ds1.TIME.max(),color='r',lw=0.5)
+        ax.hlines(ds1.mean()+ds1.std(),ds1.TIME.min(),ds1.TIME.max(),color='r',lw=0.5,ls='--')
+        ax.hlines(ds1.mean()-ds1.std(),ds1.TIME.min(),ds1.TIME.max(),color='r',lw=0.5,ls='--')
     
     if ds1.mean()>0:
         ax.vlines(ds1.TIME.where(ds1>th_p),-100,100,color='mistyrose', zorder=0)

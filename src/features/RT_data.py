@@ -168,6 +168,7 @@ def load_RT_loc(raw_data_path=sps.raw_data_dir,RT_mooring_loc=sps.RT_loc_fn):
     moor_ds=pd.read_csv(raw_data_path/RT_mooring_loc)
     moor_ds = moor_ds.set_index(['ID']).to_xarray()
     
+    
     RT_loc = xr.Dataset()
     RT_loc['lon_RTWB1'] = moor_ds.sel(ID='RTWB1').lon.values
     RT_loc['lat_RTWB1'] = moor_ds.sel(ID='RTWB1').lat.values

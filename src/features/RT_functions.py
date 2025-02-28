@@ -216,6 +216,10 @@ def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics
     #     mask_2 = mask_2 + var_i.where((var_i.TIME>tlim)).shift(PRES=-12).notnull()
 
     
+    var = var.ffill(
+        dim='PRES'
+    )
+
     var_i = var.interpolate_na(
         dim='PRES',
         method="linear",

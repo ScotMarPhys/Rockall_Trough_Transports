@@ -61,14 +61,14 @@ def create_horizontal_grid(version):
     ds_RT_loc=rtd.load_RT_loc()
     
     # create lat and lon grid
-    lon_WW = xr.DataArray(np.linspace(ds_RT_loc.lon_RTWS,ds_RT_loc.lon_RTWB,rtp.NX_WW),dims='lon_WW')
-    lat_WW = xr.DataArray(np.linspace(ds_RT_loc.lat_RTWS,ds_RT_loc.lat_RTWB,rtp.NX_WW),dims='lon_WW')
-    lon_MB = xr.DataArray(np.linspace(ds_RT_loc.lon_RTWB,ds_RT_loc.lon_RTEB,rtp.NX_MB),dims='lon_MB')
-    lat_MB = xr.DataArray(np.linspace(ds_RT_loc.lat_RTWB,ds_RT_loc.lat_RTEB,rtp.NX_MB),dims='lon_MB')
+    lon_WW = xr.DataArray(np.linspace(ds_RT_loc.lon_RTWS.values,ds_RT_loc.lon_RTWB.values,rtp.NX_WW),dims=['lon_WW'])
+    lat_WW = xr.DataArray(np.linspace(ds_RT_loc.lat_RTWS.values,ds_RT_loc.lat_RTWB.values,rtp.NX_WW),dims='lon_WW')
+    lon_MB = xr.DataArray(np.linspace(ds_RT_loc.lon_RTWB.values,ds_RT_loc.lon_RTEB.values,rtp.NX_MB),dims='lon_MB')
+    lat_MB = xr.DataArray(np.linspace(ds_RT_loc.lat_RTWB.values,ds_RT_loc.lat_RTEB.values,rtp.NX_MB),dims='lon_MB')
     
     if version=='v0':
-        lon_EW = xr.DataArray(np.linspace(ds_RT_loc.lon_RTEB,ds_RT_loc.lon_RTES,rtp.NX_EW),dims='lon_EW')
-        lat_EW = xr.DataArray(np.linspace(ds_RT_loc.lat_RTEB,ds_RT_loc.lat_RTES,rtp.NX_EW),dims='lon_EW')
+        lon_EW = xr.DataArray(np.linspace(ds_RT_loc.lon_RTEB.values,ds_RT_loc.lon_RTES.values,rtp.NX_EW),dims='lon_EW')
+        lat_EW = xr.DataArray(np.linspace(ds_RT_loc.lat_RTEB.values,ds_RT_loc.lat_RTES.values,rtp.NX_EW),dims='lon_EW')
     elif version=='v1':
         ds_glider = matlab_fct.load_glider_mat(sps.glider_data_path,sps.glider_fn)
         lon_EW = xr.DataArray(ds_glider.lon.values,dims='lon_EW')

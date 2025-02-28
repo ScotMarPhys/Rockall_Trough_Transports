@@ -1,8 +1,8 @@
 from pathlib import Path
 
-local_dir = Path("C:/Users/sa07kb/Projects/Rockall_Trough_Transports/")
+local_dir = Path.cwd() / '..'
 
-one_drive_data_dir = Path("C:/Users/sa07kb/OneDrive - SAMS/data/")
+one_drive_data_dir = Path.home()/  'shared/RT_transport_data/data/'
 
 # local paths
 local_data_dir = (local_dir/'data')

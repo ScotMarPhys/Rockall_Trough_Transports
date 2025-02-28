@@ -11,10 +11,10 @@ raw_data_dir = (local_data_dir/'raw')
 
 # Rockall Trough data
 RT_data_path = (one_drive_data_dir/ 'data_RT_mooring')
-RT_mooring_data_path = (RT_data_path / 'Rockall_Trough_moorings_time_series_2014_2024')
-prep_RT_mooring_data_path = (local_data_dir/'0.0_Rockall_Trough_moorings_data_prep_2014_2024_v1/')
-RT_transport_data_path_v0 = (local_data_dir/'1.0_Rockall_Trough_transports_2014_2024_v1/')
-RT_transport_data_path_v1 = (local_data_dir/'3.0_Rockall_Trough_transports_2014_2022_v22/')
+RT_mooring_data_path = (RT_data_path / 'Rockall_Trough_moorings_time_series')
+prep_RT_mooring_data_path = (local_data_dir/'0.0_Rockall_Trough_moorings_data_prep_2014_2022_v0/')
+RT_transport_data_path_v0 = (local_data_dir/'1.0_Rockall_Trough_transports_2014_2022_v0/')
+RT_transport_data_path_v1 = (local_data_dir/'3.0_Rockall_Trough_transports_2014_2022_v1/')
 
 # suppl data
 GEBCO_data_path = (one_drive_data_dir/ 'data_GEBCO')

@@ -27,7 +27,8 @@ EAP_path = (one_drive_data_dir/'data_climate_indices/EAP')
 
 # file names
 RT_loc_fn = 'Ellet_array_mooring_location.csv'
-glider_fn = 'glider_sections_gridded.nc'
+glider_fn = 'glider_sections_gridded.mat'
+glider_nc_fn = 'glider_sections_gridded.nc'
 GEBCO_fn = 'GEBCO_2014_2D_-22.0_55.0_-7.0_59.0.nc'
 GLORYS_fn_re = list(sorted(
         (GLORYS_data_path).glob(f"*reanalyis-phy*Vvel.nc") # reanalysis

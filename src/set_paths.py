@@ -1,8 +1,8 @@
 from pathlib import Path
 
 local_dir = Path("C:/Users/sa07kb/Projects/Rockall_Trough_Transports/")
-
 one_drive_data_dir = Path("C:/Users/sa07kb/OneDrive - SAMS/data/")
+opendap_url_gridded = "https://thredds.sams.ac.uk/thredds/dodsC/osnapstuff/Rockall_Trough_mooring_gridded_TSUV_201407_202407_v1.nc"
 
 # local paths
 local_data_dir = (local_dir/'data')
@@ -20,7 +20,7 @@ RT_transport_data_path_v1 = (local_data_dir/'3.0_Rockall_Trough_transports_2014_
 GEBCO_data_path = (one_drive_data_dir/ 'data_GEBCO')
 GLORYS_data_path = (raw_data_dir/ 'data_GLORYS')
 ERA5_data_path = (one_drive_data_dir/ 'data_ERA5/Rockall_Trough')
-glider_data_path = (one_drive_data_dir/ 'data_seaglider')
+glider_data_path = (one_drive_data_dir/ 'data_seaglider/2025_SE_Glider')
 NAO_path = (one_drive_data_dir/'data_climate_indices/NAO')
 EAP_path = (one_drive_data_dir/'data_climate_indices/EAP')
 

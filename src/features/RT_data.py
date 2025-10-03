@@ -13,6 +13,28 @@ import sys; sys.path.append(r'../../')
 import src.set_paths as sps
 import src.features.matfile_functions as matlab_fct
 
+# get mooring data from Thredds server automatically
+def load_RT_moor(file_name_in_grid):
+    if (sps.RT_mooring_data_path/file_name_in_grid).is_file():
+        ds_RT = xr.open_dataset((sps.RT_mooring_data_path/file_name_in_grid))
+        print(f"Load existing data set.")
+    else:
+        
+        opendap_url = f"https://thredds.sams.ac.uk/thredds/dodsC/osnapstuff/{file_name_in_grid}"
+        
+        try:
+            # Open the OPeNDAP dataset directly with xarray
+            ds_RT = xr.open_dataset(opendap_url)
+        
+            # # Save the full dataset to a local NetCDF file
+            ds_RT.to_netcdf(sps.RT_mooring_data_path/file_name_in_grid)
+        
+            print(f"Dataset downloaded and saved to {sps.RT_mooring_data_path/file_name_in_grid}")
+        
+        except Exception as e:
+            print(f"Error accessing or saving dataset from {opendap_url}: {e}")
+    return ds_RT
+
 def load_glorys(moor,tmin,tmax,dx=.5,dy=.5,zmin=0,zmax=1000):
     GLORYS_data_path = (sps.raw_data_dir/'data_GLORYS')
     GLORYS_data_path.mkdir(parents=True, exist_ok=True)

@@ -68,7 +68,7 @@ def load_glorys(moor,tmin,tmax,dx=.5,dy=.5,zmin=0,zmax=1000):
               minimum_latitude=np.floor(lat-dy),
               maximum_latitude=np.ceil(lat+dy),
               start_datetime=f'{tmin_str}T00:00:00',
-              end_datetime=f'{tmin_str}T00:00:00',
+              end_datetime=f'{tmax_str}T00:00:00',
               minimum_depth=zmin,
               maximum_depth=zmax,
               output_filename = GLORYS_fn,

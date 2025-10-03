@@ -742,7 +742,7 @@ def calc_Ekman_transport(ds_ERA5, RT_hor_grid,ds_RT_loc,check_plots=True):
     # Merge to dataset
     RT_Q_Ek = xr.merge([Q_Ek_WW.rename(Q_Ek_WW.attrs['name']),
                     Q_Ek_MB.rename(Q_Ek_MB.attrs['name']),
-                    Q_Ek_EW.rename(Q_Ek_EW.attrs['name'])])
+                    Q_Ek_EW.rename(Q_Ek_EW.attrs['name'])],compat="no_conflicts")
     
     if check_plots:
         (RT_Q_Ek.Q_Ek_WW+RT_Q_Ek.Q_Ek_MB+RT_Q_Ek.Q_Ek_EW).plot(lw=.5,color='k',label='tot',figsize=[6,4])

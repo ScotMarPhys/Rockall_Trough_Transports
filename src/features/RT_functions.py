@@ -416,7 +416,7 @@ def __butter_lowpass_filter(data, lowcut, fs, order=4):
 def lazy_butter_bp_filter(data, lowcut, highcut, fs,dim='time_counter'):
     y = xr.apply_ufunc(
         __butter_bandpass_filter,
-        data, lowcut, highcut, fs,
+        data.chunk({dim: -1}), lowcut, highcut, fs,
         input_core_dims=[[dim],[],[],[]],
         output_core_dims=[[dim]],
         dask='parallelized')
@@ -426,7 +426,7 @@ def lazy_butter_bp_filter(data, lowcut, highcut, fs,dim='time_counter'):
 def lazy_butter_lp_filter(data, lowcut, fs,dim='time_counter'):
     y = xr.apply_ufunc(
         __butter_lowpass_filter,
-        data, lowcut, fs,
+        data.chunk({dim: -1}), lowcut, fs,
         input_core_dims=[[dim],[],[]],
         output_core_dims=[[dim]],
         dask='parallelized')

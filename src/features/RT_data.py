@@ -165,8 +165,9 @@ def load_cruise_list():
 
 
 def load_RT_loc(raw_data_path=sps.raw_data_dir,RT_mooring_loc=sps.RT_loc_fn):
-    moor_ds=pd.read_csv(raw_data_path/RT_mooring_loc)
-    moor_ds = moor_ds.set_index(['ID']).to_xarray()
+    # moor_ds=pd.read_csv(raw_data_path/RT_mooring_loc)
+    moor_ds=xr.open_dataset(raw_data_path/RT_mooring_loc)
+    # moor_ds = moor_ds.set_index(['ID']).to_xarray()
     
     
     RT_loc = xr.Dataset()
@@ -178,8 +179,8 @@ def load_RT_loc(raw_data_path=sps.raw_data_dir,RT_mooring_loc=sps.RT_loc_fn):
     RT_loc['lat_RTWB'] = (RT_loc.lat_RTWB1 + RT_loc.lat_RTWB2)/2
     RT_loc['lon_RTEB'] = moor_ds.sel(ID='RTEB1').lon.values
     RT_loc['lat_RTEB'] = moor_ds.sel(ID='RTEB1').lat.values
-    RT_loc['lon_RTADCP'] = moor_ds.sel(ID='RTADCP').lon.values
-    RT_loc['lat_RTADCP'] = moor_ds.sel(ID='RTADCP').lat.values
+    RT_loc['lon_RTADCP'] = moor_ds.sel(ID='RTADCP1').lon.values
+    RT_loc['lat_RTADCP'] = moor_ds.sel(ID='RTADCP1').lat.values
     RT_loc['lon_RTWS'] = moor_ds.sel(ID='RTWS').lon.values
     RT_loc['lat_RTWS'] = RT_loc.lat_RTWB
     RT_loc['lon_RTES'] = moor_ds.sel(ID='RTES').lon.values

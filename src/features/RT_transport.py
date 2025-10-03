@@ -338,12 +338,14 @@ def calc_WW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_GEBCO,check_plots=True):
     
     # use m/s
     ds_RT['v_RTWB']=ds_RT.v_RTWB/1e2
-    
+
     # get meridional velocity
     v_WW = (ds_RT.v_RTWB).rename('v_WW').compute()
+    v_WW_1 = (ds_RT.V_WEST_1).rename('v_WW_1').compute()/1e2
     (v_WW,_) = xr.broadcast(v_WW,xr.DataArray(RT_hor_grid.lon_WW, dims="lon_WW"))
     v_WW.coords['lon_WW']=RT_hor_grid.lon_WW
     v_WW.coords['lat_WW']=RT_hor_grid.lat_WW
+
     v_WW = v_WW.where(RT_hor_grid.lon_WW>=ds_RT_loc.lon_RTWB1)
 
     # Upper 250 m: Linear decay from WB1 value to 0, western limit is cut off lon

@@ -25,7 +25,7 @@ NAO_path = (one_drive_data_dir/'data_climate_indices/NAO')
 EAP_path = (one_drive_data_dir/'data_climate_indices/EAP')
 
 # file names
-RT_loc_fn = 'Ellet_array_mooring_location.csv'
+RT_loc_fn = 'Ellet_array_mooring_location_mean.nc'
 glider_fn = 'glider_sections_gridded.mat'
 GEBCO_fn = 'GEBCO_2014_2D_-22.0_55.0_-7.0_59.0.nc'
 GLORYS_fn_re = list(sorted(

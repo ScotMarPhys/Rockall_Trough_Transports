@@ -114,7 +114,7 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
     sigma = gsw.sigma0(ds_RT.SG_WEST, ds_RT.TG_WEST)
 
     # Create merged WB1/2 CM
-    ds_RT = rtf.merge_RT_WB1_2(ds_RT)
+    # ds_RT = rtf.merge_RT_WB1_2(ds_RT)
 
     ax = axs[0,1]
     imV = (ds_RT.v_RTWB*1e-2).plot(ax=ax,x='TIME',yincrease=False,

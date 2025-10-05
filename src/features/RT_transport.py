@@ -102,7 +102,8 @@ def create_horizontal_grid(version):
                             dx_EW.rename('dx_EW'),
                             lat_WW.rename('lat_WW'),
                             lat_MB.rename('lat_MB'),
-                            lat_EW.rename('lat_EW')])
+                            lat_EW.rename('lat_EW')],
+                          compat='no_conflicts')
     RT_hor_grid.coords['lon_WW']=lon_WW.values
     RT_hor_grid.coords['lon_MB_1']=lon_MB.values
     RT_hor_grid.coords['lon_EW']=lon_EW.values
@@ -212,7 +213,8 @@ def calc_MB_transport(ds_RT,ds_RT_loc,sens_analysis=True,check_plots=True):
                         Q_MB_CTfix.rename(Q_MB_CTfix.attrs['name']),
                         Q_MB_SAfix_CTfix.rename(Q_MB_SAfix_CTfix.attrs['name']),
                         Q_MB_WB_CTvar.rename(Q_MB_WB_CTvar.attrs['name']),
-                        Q_MB_EB_CTvar.rename(Q_MB_EB_CTvar.attrs['name'])]
+                        Q_MB_EB_CTvar.rename(Q_MB_EB_CTvar.attrs['name'])],
+                           compat='no_conflicts'
                           ).drop_vars(['lat_MB','lon_MB'])
     else:
         RT_Q_MB = Q_MB.drop_vars(['lat_MB','lon_MB'])
@@ -308,8 +310,8 @@ def calc_MB_3D_sections(ds_RT,ds_RT_loc,RT_hor_grid):
     ds_RT_MB_grid = xr.merge([q_MB_grid.rename('q'),
                               v.rename('v'),
                           TG_MB_grid.rename('CT').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB),
-                          SG_MB_grid.rename('SA').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB)]
-                            )
+                          SG_MB_grid.rename('SA').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB)],
+                            compat='no_conflicts')
     ds_RT_MB_grid.coords['mask'] = q_MB_grid.notnull()
     ds_RT_MB_grid = ds_RT_MB_grid.rename({'lat_MB':'lat','lon_MB':'lon','dx_MB':'dx'})
     
@@ -742,7 +744,8 @@ def calc_Ekman_transport(ds_ERA5, RT_hor_grid,ds_RT_loc,check_plots=True):
     # Merge to dataset
     RT_Q_Ek = xr.merge([Q_Ek_WW.rename(Q_Ek_WW.attrs['name']),
                     Q_Ek_MB.rename(Q_Ek_MB.attrs['name']),
-                    Q_Ek_EW.rename(Q_Ek_EW.attrs['name'])],compat="no_conflicts")
+                    Q_Ek_EW.rename(Q_Ek_EW.attrs['name'])],
+                       compat="no_conflicts")
     
     if check_plots:
         (RT_Q_Ek.Q_Ek_WW+RT_Q_Ek.Q_Ek_MB+RT_Q_Ek.Q_Ek_EW).plot(lw=.5,color='k',label='tot',figsize=[6,4])
@@ -823,11 +826,13 @@ def calc_transports(Q,q,CT,SA,dims,sec_str):
     ds_Q = xr.merge([Q.rename(Q.attrs['name']),
                      Qh.rename(Qh.attrs['name']),
                      Qf.rename(Qf.attrs['name']),
-                     QS.rename(QS.attrs['name'])])
+                     QS.rename(QS.attrs['name'])],
+                   compat='no_conflicts')
     ds_q = xr.merge([q.rename(q.attrs['name']),
                      qh.rename(qh.attrs['name']),
                      qf.rename(qf.attrs['name']),
-                     qS.rename(qS.attrs['name'])])
+                     qS.rename(qS.attrs['name'])],
+                   compat='no_conflicts')
     
     if 'mask' in str(Q.coords):
         ds_Q.coords[f'mask_{sec_str[:2]}'] = Q[f'mask_{sec_str[:2]}']

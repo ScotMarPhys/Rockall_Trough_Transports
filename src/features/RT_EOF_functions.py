@@ -3,37 +3,30 @@ import scipy
 import numpy as np
 import xarray as xr
 import xeofs as xe
+import pandas as pd
 from matplotlib import pyplot as plt
 import src.features.RT_transport as rtt
 
-def add_nan_glider_sections(ds_glider,dim='time'):
-    t1=np.datetime64('2020-09-01', 'ns')
-    t2=np.datetime64('2021-03-01', 'ns')
-    t3=np.datetime64('2021-09-01', 'ns')
-    t4=np.datetime64('2022-03-01', 'ns')
-    t5=np.datetime64('2022-06-01', 'ns')
-    t6=np.datetime64('2022-10-01', 'ns')
-    dummy1=ds_glider.isel({dim:0})*np.nan
-    dummy1[dim]=t1
-    dummy2=ds_glider.isel({dim:0})*np.nan
-    dummy2[dim]=t2
-    dummy3=ds_glider.isel({dim:0})*np.nan
-    dummy3[dim]=t3
-    dummy4=ds_glider.isel({dim:0})*np.nan
-    dummy4[dim]=t4
-    dummy5=ds_glider.isel({dim:0})*np.nan
-    dummy5[dim]=t5
-    dummy6=ds_glider.isel({dim:0})*np.nan
-    dummy6[dim]=t6
-    ds_glider_nan = xr.concat([ds_glider.sel({dim:slice(None,t1)}),dummy1,
-                              ds_glider.sel({dim:slice(t1,t2)}),dummy2,
-                              ds_glider.sel({dim:slice(t2,t3)}),dummy3,
-                              ds_glider.sel({dim:slice(t3,t4)}),dummy4,
-                              ds_glider.sel({dim:slice(t4,t5)}),dummy5,
-                              ds_glider.sel({dim:slice(t5,t6)}),dummy6,
-                              ds_glider.sel({dim:slice(t6,None)}),
-                              ],
-                             dim=dim)
+def add_nan_glider_sections(ds_glider,dim='time',gap='16 day'):
+    time_diff = ds_glider.TIME.diff('TIME')
+    gap_mask = time_diff > pd.Timedelta(gap)
+    test = gap_mask.TIME.where(gap_mask,drop=True)-pd.Timedelta('1 day')
+    for i,t1 in enumerate(test):
+        dummy1=ds_glider.isel({dim:0})*np.nan
+        dummy1[dim]=t1
+        if i==0:
+            ds_glider_nan = xr.concat([ds_glider.sel(
+                {dim:slice(None,t1)}),dummy1],
+                                 dim=dim)    
+        else:
+            ds_glider_nan = xr.concat([ds_glider_nan,ds_glider.sel(
+                {dim:slice(test.isel({dim:i-1}),t1)}),dummy1],
+                                 dim=dim)
+        if i==len(test)-1:
+            ds_glider_nan = xr.concat([ds_glider_nan,ds_glider.sel(
+                {dim:slice(t1,None)})],
+                                 dim=dim)
+    
     return ds_glider_nan
 
 def normalize(x=None, y=None):

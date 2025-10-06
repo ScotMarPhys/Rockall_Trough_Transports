@@ -142,6 +142,24 @@ def load_glorys(moor,tmin,tmax,dx=.5,dy=.5,zmin=0,zmax=1000):
                                        (GLORYS_data_path/GLORYS_fn_an)])
     return ds_GLORYS
 
+def load_glider_nc():
+    ds_glider = xr.open_dataset((sps.glider_data_path_nc/sps.glider_nc_fn),decode_times=False)
+    ds_glider['t'] = matlab_fct.mt2dt(ds_glider.t)
+
+    ds_glider_hydro = ds_glider.drop_vars(['v','vg'])
+    ds_glider_hydro = ds_glider_hydro.drop_dims(['x2'])
+
+    #change names and dims to work with other functions/notebooks
+    ds_glider_vel = ds_glider.drop_vars(['SA','CT','lat','lon','eta','bathy'])
+    ds_glider_vel = ds_glider.drop_dims(['x']).rename({'x2':'x','t':'time','z':'depth','v':'vcur'})
+    ds_glider_vel = ds_glider_vel.assign_coords(lat=('x',ds_glider.lat.data[:-1]))
+    ds_glider_vel = ds_glider_vel.assign_coords(
+        lon=('x',((ds_glider.lon.data[:-1]+ds_glider.lon.data[1:])/2)))
+    ds_glider_vel = ds_glider_vel.swap_dims({'x':'lon'})
+   
+
+    return ds_glider_hydro, ds_glider_vel
+
 def load_eap():
     ds_EAP = xr.open_dataset((sps.EAP_path/sps.EAP_fn),decode_times=False)
     datesin = cftime.num2date(ds_EAP.T, ds_EAP.T.units, '360_day')

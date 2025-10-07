@@ -257,7 +257,7 @@ def plot_longterm(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
     ax.grid()
 
 
-def plot_error(da_Q_obs,da_Q_rec,mode,axs):
+def plot_error(da_Q_obs,da_Q_rec,mode,axs,title_str='EW'):
     
     if mode==0:
         Q_rec = da_Q_rec
@@ -271,7 +271,7 @@ def plot_error(da_Q_obs,da_Q_rec,mode,axs):
             result = scipy.stats.linregress(Q_rec,da_Q_obs)
             RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('TIME'))
             axs.plot(da_Q_obs,Q_rec,'.',
-                     label=f'EW, {Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
+                     label=f'{title_str}, {Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
     axs.plot(np.arange(-7,11),np.arange(-7,11),color='k',lw=0.8,ls='--')
     axs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2))
     axs.set_xlabel('Observed transport')

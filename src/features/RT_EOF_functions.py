@@ -8,9 +8,9 @@ from matplotlib import pyplot as plt
 import src.features.RT_transport as rtt
 
 def add_nan_glider_sections(ds_glider,dim='time',gap='16 day'):
-    time_diff = ds_glider.TIME.diff('TIME')
+    time_diff = ds_glider[dim].diff(dim)
     gap_mask = time_diff > pd.Timedelta(gap)
-    test = gap_mask.TIME.where(gap_mask,drop=True)-pd.Timedelta('1 day')
+    test = gap_mask[dim].where(gap_mask,drop=True)-pd.Timedelta('1 day')
     for i,t1 in enumerate(test):
         dummy1=ds_glider.isel({dim:0})*np.nan
         dummy1[dim]=t1

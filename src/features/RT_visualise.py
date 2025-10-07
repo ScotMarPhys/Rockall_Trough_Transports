@@ -22,6 +22,10 @@ from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
 from matplotlib import pyplot as plt
 
+def date_str_func(ds,dim='TIME'):
+    date_str = f'{ds[dim].min().dt.strftime("%Y/%m").values}-{ds[dim].max().dt.strftime("%Y/%m").values}'
+    return date_str
+
 def plot_figure_gap(v_merge,y_pred,py_str,y_pred_lp,py_lp_str,period=[None,None]):
         fig,axs = plt.subplots(3,1,figsize=[15,8])
         ax = axs[0]

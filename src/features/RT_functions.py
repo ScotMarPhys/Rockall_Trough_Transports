@@ -23,6 +23,20 @@ import src.set_paths as sps
 import src.features.RT_data as rtd
 import src.features.matfile_functions as matlab_fct
 
+# which times are duplicated
+def check_for_duplicates(ds,dim,remove=True):
+    print(ds[dim].to_index().duplicated().any())
+    
+    if ds[dim].to_index().duplicated().any():
+        ds[dim].diff(dim).plot.line('.',ms='7',label='Time series with duplicates') 
+        print(ds[dim].to_index()[ds[dim].to_index().duplicated()])
+        
+        test = ds.sel(T=~ds[dim].to_index().duplicated())
+        test[dim].diff(dim).plot.line('.',ms='4',label='Duplicates removed') 
+        plt.legend()
+        if remove==True:
+            return test
+
 def rename_vars(ds,var_str):
     ds_new = xr.Dataset()
     for var in ds.data_vars:

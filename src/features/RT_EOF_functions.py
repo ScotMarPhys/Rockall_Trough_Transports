@@ -257,27 +257,46 @@ def plot_longterm(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
     ax.grid()
 
 
-def plot_error(da_Q_obs,da_Q_rec,mode,axs,title_str='EW'):
+def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW'):
+    if var_str=='Q':
+        unit_str = 'SV'
+    elif var_str=='CT':
+        unit_str = r'$\degree$C'
+    elif var_str=='SA':
+        unit_str = 'g/kg'
+    
     
     if mode==0:
         Q_rec = da_Q_rec
         result = scipy.stats.linregress(Q_rec,da_Q_obs)
         RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('TIME'))
         axs.plot(da_Q_obs,Q_rec,'.',
-             label=f'EW-F22, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
+             label=f'EW-F22, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} ')
     else:
         for i in range(mode):
             Q_rec = da_Q_rec.isel(mode=i)
             result = scipy.stats.linregress(Q_rec,da_Q_obs)
             RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('TIME'))
             axs.plot(da_Q_obs,Q_rec,'.',
-                     label=f'{title_str}, {Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
-    axs.plot(np.arange(-7,11),np.arange(-7,11),color='k',lw=0.8,ls='--')
+                     label=f'{title_str}, {Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} ')
+    
+    axs.plot(np.arange(-7,50),np.arange(-7,50),color='k',lw=0.8,ls='--')
+    if var_str=='Q':
+        axs.set_xlabel('Observed transport')
+        axs.set_ylabel('Reconstructed transport')
+        axs.set_ylim([-3,11])
+        axs.set_xlim([-6,10])
+    elif var_str=='CT':
+        axs.set_xlabel('Observed CT')
+        axs.set_ylabel('Reconstructed CT')
+        axs.set_ylim([7,12.5])
+        axs.set_xlim([7,12.5])
+    elif var_str=='SA':
+        axs.set_xlabel('Observed SA')
+        axs.set_ylabel('Reconstructed SA')
+        axs.set_ylim([35.3,35.6])
+        axs.set_xlim([35.3,35.6])
     axs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2))
-    axs.set_xlabel('Observed transport')
-    axs.set_ylabel('Reconstructed transport')
-    axs.set_ylim([-3,11])
-    axs.set_xlim([-6,10])
     axs.set_aspect('equal', adjustable='box')
     axs.grid()
     axs.axvline(0,color='k',lw=0.8,ls='--')

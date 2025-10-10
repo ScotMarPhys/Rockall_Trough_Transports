@@ -146,19 +146,11 @@ def load_glider_nc():
     ds_glider = xr.open_dataset((sps.glider_data_path_nc/sps.glider_nc_fn),decode_times=False)
     ds_glider['t'] = matlab_fct.mt2dt(ds_glider.t)
 
-    ds_glider_hydro = ds_glider.drop_vars(['v','vg'])
-    ds_glider_hydro = ds_glider_hydro.drop_dims(['x2'])
+    ds_glider = ds_glider.interp(x=ds_glider.x2).drop_vars('x')
+    ds_glider = ds_glider.rename({'x2':'x','t':'time','z':'depth','v':'vcur'})
+    ds_glider = ds_glider.set_coords(['lon','lat']).swap_dims({'x':'lon'})
 
-    #change names and dims to work with other functions/notebooks
-    ds_glider_vel = ds_glider.drop_vars(['SA','CT','lat','lon','eta','bathy'])
-    ds_glider_vel = ds_glider.drop_dims(['x']).rename({'x2':'x','t':'time','z':'depth','v':'vcur'})
-    ds_glider_vel = ds_glider_vel.assign_coords(lat=('x',ds_glider.lat.data[:-1]))
-    ds_glider_vel = ds_glider_vel.assign_coords(
-        lon=('x',((ds_glider.lon.data[:-1]+ds_glider.lon.data[1:])/2)))
-    ds_glider_vel = ds_glider_vel.swap_dims({'x':'lon'})
-   
-
-    return ds_glider_hydro, ds_glider_vel
+    return ds_glider
 
 def load_eap():
     ds_EAP = xr.open_dataset((sps.EAP_path/sps.EAP_fn),decode_times=False)
@@ -174,7 +166,7 @@ def load_nao():
 
     ds_NAO = xr.Dataset(
         data_vars=dict(
-            NAO_index=(['time'],df_NAO['index'])),
+            NAO_index=(['time'],df_NAO['nao_index_cdas'])),
         coords=dict(
             time=date),
         attrs=dict(

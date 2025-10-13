@@ -4,6 +4,7 @@ import numpy as np
 import xarray as xr
 import xeofs as xe
 import pandas as pd
+import cmocean as cm
 from matplotlib import pyplot as plt
 import src.features.RT_transport as rtt
 
@@ -195,29 +196,54 @@ def calc_transport_VHF(da_v):
 
 ### visualisation functions
 
-def plot_mean_section(ds_glider,ds_q_RT,v_rec,mode_no=1,mean=False):
+def plot_mean_section(ds_glider,ds_q_RT,v_rec,mode_no=1,mean=False,var_str='v'):
     
     fig,axs = plt.subplots(1,4,figsize=[15,3])
-    vmin,vmax,levs=-0.2,0.2,41
+    
+    sal_levs = np.arange(35.2,35.7,.05)
+
+    if var_str=='v':
+        levs=np.linspace(-0.2,0.2,41)
+        cmap='RdBu_r'
+        da_glider = ds_glider.vcur
+        da_moor = ds_q_RT.v
+        title_str='Merid. Vel. [m/s]'
+    elif var_str=='CT':
+        levs = np.arange(5,15,.5)
+        cmap = cm.cm.thermal
+        da_glider = ds_glider.CT
+        da_moor = ds_q_RT.CT
+        title_str=r'Cons. Temp. [$\degree$C]'
+    elif var_str=='SA':
+        levs = np.arange(35.2,35.7,.05)
+        cmap = cm.cm.haline
+        da_glider = ds_glider.SA
+        da_moor = ds_q_RT.SA
+        title_str='Abs. Sal [g/kg]'
+
     ax=axs[0]
-    ds_glider.vcur.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
-                                       vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+    da_glider.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
+                                       levels=levs,cmap=cmap,
+                            cbar_kwargs={'label': title_str})
     ax.set_title('Glider')
     ax=axs[1]
-    ds_q_RT.v.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
-                                  vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+    da_moor.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
+                                  levels=levs,cmap=cmap,
+                            cbar_kwargs={'label': title_str})
     ax.set_title('RT EW full')
     v_EOF = v_rec.sel(mode=mode_no)
     if mean:
         v_EOF = v_EOF.mean('mode')        
     ax=axs[2]
     v_EOF.mean('TIME').plot(x='lon',ax=ax,yincrease=False,
-                            vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+                            levels=levs,cmap=cmap,
+                            cbar_kwargs={'label': title_str})
     ax.set_title(f'EOF {mode_no} full')
     ax=axs[3]
     v_EOF.interp(TIME=ds_glider.TIME.values
                     ).mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
-                                          vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+                                          levels=levs,cmap=cmap,
+                                        cbar_kwargs={'label': title_str})
     ax.set_title(f'EOF {mode_no} resampled')
     plt.tight_layout()
 

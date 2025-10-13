@@ -186,6 +186,13 @@ def calc_transport(da_v):
     T.attrs = {'long_name':'Meridional Transport','units':'Sv'}
     return T
 
+def calc_transport_VHF(da_v):
+    dx = gsw.distance(da_v.lon[:2],da_v.lat[:2])
+    dz = rtt.get_dz(da_v.depth)
+    T = ((da_v.rename('Q')*dx*dz).sum(['lon','depth'])*1e-6)
+    T.attrs = {'long_name':'Meridional Transport','units':'Sv'}
+    return T
+
 ### visualisation functions
 
 def plot_mean_section(ds_glider,ds_q_RT,v_rec,mode_no=1,mean=False):
@@ -259,7 +266,11 @@ def plot_longterm(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
 
 def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW'):
     if var_str=='Q':
-        unit_str = 'SV'
+        unit_str = 'Sv'    
+    elif var_str=='Qh':
+        unit_str = 'PW'    
+    elif var_str=='Qf':
+        unit_str = 'Sv'
     elif var_str=='CT':
         unit_str = r'$\degree$C'
     elif var_str=='SA':
@@ -286,6 +297,18 @@ def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW'):
         axs.set_ylabel('Reconstructed transport')
         axs.set_ylim([-3,11])
         axs.set_xlim([-6,10])
+        
+    if var_str=='Qh':
+        axs.set_xlabel('Observed heat transport')
+        axs.set_ylabel('Reconstructed heat transport')
+        axs.set_ylim([-6,6]*1e-2)
+        axs.set_xlim([-6,6]*1e-2)
+        
+    if var_str=='Qf':
+        axs.set_xlabel('Observed transport')
+        axs.set_ylabel('Reconstructed transport')
+        axs.set_ylim([-4,4]*1e-2)
+        axs.set_xlim([-4,4]*1e-2)
     elif var_str=='CT':
         axs.set_xlabel('Observed CT')
         axs.set_ylabel('Reconstructed CT')

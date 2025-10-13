@@ -803,7 +803,10 @@ def calc_transports(Q,q,CT,SA,dims,sec_str):
     Q.attrs['name']= f'Q'
     Q.attrs['long_name']= f'Volume Transport'
     Q.attrs['units']=Q.units
-    Q.attrs['description']=Q.description
+    if hasattr(Q, 'description'):
+        Q.attrs['description']=Q.description
+    else:
+        Q.attrs['description']=f'Volume transport for Rockall Trough {sec_str}'
     
     Qh.attrs['name']= f'Qh'
     Qh.attrs['long_name']= f'Heat transport'

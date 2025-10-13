@@ -263,8 +263,29 @@ def plot_longterm(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
     ax.legend()
     ax.grid()
 
+def plot_linregress(var_1, var_2,axs=0,t_dim='TIME',
+                    label_str = 'EW', xlabel_str='Observed', ylabel_str='Reconstructed',
+                    unit_str='Sv', ylim=[-5,5], xlim=[-5,5]):
 
-def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW'):
+    result = scipy.stats.linregress(var_1,var_2)
+    RMSE = np.sqrt(((var_1 - var_2)**2).mean(t_dim))
+    
+    axs.plot(var_1,var_2,'.',
+         label=f'{label_str}, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:.2e} {unit_str}, \nSTDE={result.stderr:.2e} ')
+        
+    axs.plot(np.arange(-7,50),np.arange(-7,50),color='k',lw=0.8,ls='--')
+    axs.set_xlabel(xlabel_str)
+    axs.set_ylabel(ylabel_str)
+    axs.set_ylim(ylim)
+    axs.set_xlim(xlim)
+    
+    axs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2))
+    axs.set_aspect('equal', adjustable='box')
+    axs.grid()
+    axs.axvline(0,color='k',lw=0.8,ls='--')
+    axs.axhline(0,color='k',lw=0.8,ls='--')
+
+def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW',t_dim='TIME'):
     if var_str=='Q':
         unit_str = 'Sv'    
     elif var_str=='Qh':
@@ -280,14 +301,14 @@ def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW'):
     if mode==0:
         Q_rec = da_Q_rec
         result = scipy.stats.linregress(Q_rec,da_Q_obs)
-        RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('TIME'))
+        RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
         axs.plot(da_Q_obs,Q_rec,'.',
              label=f'EW-F22, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} ')
     else:
         for i in range(mode):
             Q_rec = da_Q_rec.isel(mode=i)
             result = scipy.stats.linregress(Q_rec,da_Q_obs)
-            RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('TIME'))
+            RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
             axs.plot(da_Q_obs,Q_rec,'.',
                      label=f'{title_str}, {Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} ')
     

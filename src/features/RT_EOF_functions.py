@@ -7,6 +7,7 @@ import pandas as pd
 import cmocean as cm
 from matplotlib import pyplot as plt
 import src.features.RT_transport as rtt
+import src.features.RT_visualise as rtv
 
 def add_nan_glider_sections(ds_glider,dim='time',gap='16 day'):
     time_diff = ds_glider[dim].diff(dim)
@@ -385,18 +386,18 @@ def plot_transport(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
     ax.legend()
     ax.grid()
 
-def plot_seasonal_cycle_Q(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
+def plot_seasonal_cycle_Q(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False,show_leg=True,show_xl=True):
     color='C0'
     m=Q_glider.groupby('TIME.month').mean('TIME')
     d=Q_glider.groupby('TIME.month').std('TIME')
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, 
-                color=color,label='Glider')
+                color=color,label=f'Glider {rtv.date_str_func(Q_glider)}')
 
     color='C1'
     m = Q_moor.groupby('TIME.month').mean('TIME') 
     d=Q_moor.groupby('TIME.month').std('TIME')
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, 
-                color=color,label='RT EW full')
+                color=color,label=f'RT EW {rtv.date_str_func(Q_moor)}')
 
     v_EOF = Q_rec.sel(mode=mode_no)
     if mean:
@@ -406,7 +407,7 @@ def plot_seasonal_cycle_Q(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
     m = v_EOF.groupby('TIME.month').mean('TIME') 
     d=v_EOF.groupby('TIME.month').std('TIME')
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, 
-                color=color,label=f'EOF {mode_no} full')
+                color=color,label=f'EOF {mode_no} {rtv.date_str_func(v_EOF)}')
 
     color='C3'
     dummy = v_EOF.interp(TIME=Q_glider.TIME.values)
@@ -421,9 +422,12 @@ def plot_seasonal_cycle_Q(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
     d = Q_glider.sel(TIME=slice(None,v_EOF.TIME.max())
                     ).groupby('TIME.month').std('TIME')
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, 
-                color=color,label=f'Glider 2020- Oct 2022')
+                color=color,label=f'Glider {rtv.date_str_func(Q_glider.sel(TIME=slice(None,v_EOF.TIME.max())
+                    ))}')
     
     ax.grid()
-    ax.legend(bbox_to_anchor=(0,1.02,1,0.2),loc='lower left',mode='expand',ncol=2)
-    ax.set_xlabel('Month of year')
+    if show_leg:
+        ax.legend(bbox_to_anchor=(0,1.02,1,0.2),loc='lower left',mode='expand',ncol=2)
+    if show_xl:
+        ax.set_xlabel('Month of year')
     ax.set_ylabel(f'{Q_glider.long_name} [{Q_glider.units}]')

@@ -182,14 +182,14 @@ def rec_v_sec(ds_X,ds_y,glider_EOF,glider_vcur,HEOF=False,TIME_dim='TIME'):
     return v_rec_sec
 
 def calc_transport(da_v):
-    dx = gsw.distance(da_v.lon[:2],da_v.lat[:2])
-    dz = rtt.get_dz(da_v.depth)
+    dx = rtt.get_dx(da_v.lon,da_v.lat,dim='lon')
+    dz = rtt.get_dz(np.abs(da_v.depth))
     T = ((da_v.rename('Q')*dx*dz).sum(['lon','depth'])*1e-6)
     T.attrs = {'long_name':'Meridional Transport','units':'Sv'}
     return T
 
 def calc_transport_VHF(da_v):
-    dx = gsw.distance(da_v.lon[:2],da_v.lat[:2])
+    dx = rtt.get_dx(da_v.lon,da_v.lat,dim='lon')
     dz = rtt.get_dz(da_v.depth)
     T = ((da_v.rename('Q')*dx*dz).sum(['lon','depth'])*1e-6)
     T.attrs = {'long_name':'Meridional Transport','units':'Sv'}

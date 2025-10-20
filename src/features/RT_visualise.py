@@ -21,6 +21,65 @@ from pathlib import Path
 from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
 from matplotlib import pyplot as plt
+import matplotlib.ticker as ticker
+
+def create_formatter(direction, ax):
+    """
+    Creates a FuncFormatter that adjusts decimal precision based on tick spacing.
+    """
+    def formatter(x, pos):
+        # Get the interval between major ticks
+        major_locator = ax.xaxis.get_major_locator() if direction in ('lon', 'x') else ax.yaxis.get_major_locator()
+        try:
+            # `tick_values` might not be available or stable on all locators,
+            # so we'll get the ticks from the ax object.
+            ticks = major_locator.tick_values(ax.get_xlim()[0], ax.get_xlim()[1]) if direction in ('lon', 'x') else major_locator.tick_values(ax.get_ylim()[0], ax.get_ylim()[1])
+            if len(ticks) > 1:
+                interval = abs(ticks[1] - ticks[0])
+            else:
+                interval = 1 # Default interval if not enough ticks
+        except Exception:
+            interval = 1
+        
+        # Determine formatting based on the tick interval
+        if interval < 1:
+            fmt = ".1f" # Use one decimal place for fine intervals
+        else:
+            fmt = ".0f" # Use no decimal places for coarse intervals
+
+        if direction == 'lon':
+            if x > 0:
+                return f"{x:{fmt}}{r'$\degree$'}E"
+            elif x < 0:
+                return f"{-x:{fmt}}{r'$\degree$'}W"
+            else:
+                return f"{x:{fmt}}{r'$\degree$'}"
+        elif direction == 'lat':
+            if x > 0:
+                return f"{x:{fmt}}{r'$\degree$'}N"
+            elif x < 0:
+                return f"{-x:{fmt}}{r'$\degree$'}S"
+            else:
+                return f"{x:{fmt}}{r'$\degree$'}"
+    return ticker.FuncFormatter(formatter)
+
+def axis_lat_lon_formatter(ax,form='xlon'):
+    if form=='xlon':
+        lon_formatter = create_formatter('lon', ax)
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lon_formatter))
+        ax.set_xlabel('')
+    elif form=='xlat':
+        lon_formatter = create_formatter('lat', ax)
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lat_formatter))
+        ax.set_xlabel('')
+    elif form=='ylon':
+        lon_formatter = create_formatter('lon', ax)
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lon_formatter))
+        ax.set_ylabel('')
+    elif form=='ylat':
+        lon_formatter = create_formatter('lat', ax)
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lat_formatter))
+        ax.set_ylabel('')
 
 def date_str_func(ds,dim='TIME'):
     date_str = f'{ds[dim].min().dt.strftime("%Y/%m").values}-{ds[dim].max().dt.strftime("%Y/%m").values}'

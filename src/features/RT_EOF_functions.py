@@ -339,12 +339,12 @@ def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW',t_dim='TIME
             axs.plot(da_Q_obs,Q_rec,'.',
                      label=f'{title_str}, {Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} ')
     
-    axs.plot(np.arange(-7,50),np.arange(-7,50),color='k',lw=0.8,ls='--')
+    axs.plot(np.arange(-50,50),np.arange(-50,50),color='k',lw=0.8,ls='--')
     if var_str=='Q':
         axs.set_xlabel('Observed transport')
         axs.set_ylabel('Reconstructed transport')
-        axs.set_ylim([-3,11])
-        axs.set_xlim([-6,10])
+        axs.set_ylim([-8,8])
+        axs.set_xlim([-8,8])
         
     if var_str=='Qh':
         axs.set_xlabel('Observed heat transport')
@@ -367,7 +367,7 @@ def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW',t_dim='TIME
         axs.set_ylabel('Reconstructed SA')
         axs.set_ylim([35.3,35.6])
         axs.set_xlim([35.3,35.6])
-    axs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2))
+    axs.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     axs.set_aspect('equal', adjustable='box')
     axs.grid()
     axs.axvline(0,color='k',lw=0.8,ls='--')

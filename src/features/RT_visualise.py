@@ -81,8 +81,11 @@ def axis_lat_lon_formatter(ax,form='xlon'):
         ax.yaxis.set_major_formatter(plt.FuncFormatter(lat_formatter))
         ax.set_ylabel('')
 
-def date_str_func(ds,dim='TIME'):
-    date_str = f'{ds[dim].min().dt.strftime("%Y/%m").values}-{ds[dim].max().dt.strftime("%Y/%m").values}'
+def date_str_func(ds,dim='TIME',formatter="%Y/%m",save_pic=False):
+    if save_pic:
+        date_str = f'{ds[dim].min().dt.strftime(formatter).values}_{ds[dim].max().dt.strftime(formatter).values}'
+    else:
+        date_str = f'{ds[dim].min().dt.strftime(formatter).values}-{ds[dim].max().dt.strftime(formatter).values}'
     return date_str
 
 def plot_figure_gap(v_merge,y_pred,py_str,y_pred_lp,py_lp_str,period=[None,None]):
@@ -392,16 +395,18 @@ def plot_RT_mean_sections_from_mooring(ds_q_RT,ds_RT_loc):
     plt.rcParams.update({'font.size': 14})
 
     xticks = np.arange(-13.,-8,1)
-    xticklabels = ['13°W','12°W','11°W','10°W','9°W']
+    xticklabels = [r'13$\degree$W',r'12$\degree$W',r'11$\degree$W',
+                   r'10$\degree$W',r'9$\degree$W']
 
     sigma_contours = [27.2,27.5, 27.7]
     manual_locations = [(-12,100),(-12,900),(-12,1250)]
 
     # Set up figure
-    fig,axs = plt.subplots(3,1,figsize=[10,13])
+    fig,axs = plt.subplots(3,1,figsize=[10,18])
 
     ds_q_RT.v.mean('time',keep_attrs=True).plot(
-        ax=axs[0],y='depth',x='lon',yincrease=False,cmap=cm.cm.balance)
+        ax=axs[0],y='depth',x='lon',yincrease=False,cmap=cm.cm.balance,
+    cbar_kwargs={'label':'Meridional velocity (m/s)'})
     ds_q_RT.SA.mean('time',keep_attrs=True).plot(
         ax=axs[1],y='depth',x='lon',yincrease=False,cmap=cm.cm.haline)
     ds_q_RT.CT.mean('time',keep_attrs=True).plot(

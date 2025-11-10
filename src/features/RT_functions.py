@@ -252,11 +252,10 @@ def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics
             ).where(mask)
     return var_i
 
-def repeat_upper_values(var):
-    mask = var.notnull()
-    mask = mask + var.shift(PRES=-10).notnull()
+def repeat_upper_values(var,dim='PRES'):
+    mask = var.bfill(dim=dim).notnull()
     var = var.interpolate_na(
-        dim='PRES',
+        dim=dim,
         method="nearest",
         fill_value="extrapolate",
     ).where(mask)
@@ -356,18 +355,21 @@ def calc_sigma0(ds):
 
 
 
-def calc_SA_CT_sigma0(ds):
-    
-    ds = ds.rename({'TIME':'time',
-                            'LATITUDE':'lat',
-                            'LONGITUDE':'lon',
-                            'DEPTH':'depth',
-                            'VELO':'vel',
-                            'TEMP':'temp',
-                            'SAL':'psal'})
-    ds['lat']=('lon',ds.lat.values)
-    dt='12hr'
-    ds['time']=ds.time - pd.Timedelta(dt)
+def calc_SA_CT_sigma0(ds, case='moor'):
+
+    if case=='moor':
+        ds = ds.rename({'TIME':'time',
+                                'LATITUDE':'lat',
+                                'LONGITUDE':'lon',
+                                'DEPTH':'depth',
+                                'VELO':'vel',
+                                'TEMP':'temp',
+                                'SAL':'psal'})
+        ds['lat']=('lon',ds.lat.values)
+        dt='12hr'
+        ds['time']=ds.time - pd.Timedelta(dt)
+        
+
     CT_attrs = {'long_name':'Conservative temperature',
               'description':'conservative temperature TEOS-10',
               'units':'degC'}
@@ -390,9 +392,13 @@ def calc_SA_CT_sigma0(ds):
                   dask = 'parallelized',output_dtypes=[float,])
     ds.SA.attrs = SA_attrs
 
-
-    ds['CT'] = xr.apply_ufunc(gsw.CT_from_t,
+    if case=='moor':
+        ds['CT'] = xr.apply_ufunc(gsw.CT_from_t,
                   ds.SA,ds.temp,ds.PRES,
+                  dask = 'parallelized',output_dtypes=[float,])
+    elif case=='ship':
+        ds['CT'] = xr.apply_ufunc(gsw.CT_from_pt,
+                  ds.SA,ds.ptmp,
                   dask = 'parallelized',output_dtypes=[float,])
     ds.CT.attrs = CT_attrs
 

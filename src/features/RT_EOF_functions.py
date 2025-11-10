@@ -188,12 +188,16 @@ def calc_transport(da_v):
     T.attrs = {'long_name':'Meridional Transport','units':'Sv'}
     return T
 
-def calc_transport_VHF(da_v):
-    dx = rtt.get_dx(da_v.lon,da_v.lat,dim='lon')
-    dz = rtt.get_dz(da_v.depth)
-    T = ((da_v.rename('Q')*dx*dz).sum(['lon','depth'])*1e-6)
-    T.attrs = {'long_name':'Meridional Transport','units':'Sv'}
-    return T
+def calc_transport_VHF(ds,dims,sec_str):
+    dx = gsw.distance(ds.vcur.lon[:2],ds.lat[:2])
+    dz = rtt.get_dz(ds.vcur.depth)
+    q = ds.vcur.rename('q')*dx*dz
+    Q = q.sum(dims)*1e-6
+    Q.attrs = {'long_name':'Volume Transport','units':'Sv'}
+
+    ds_Q,ds_q = rtt.calc_transports(Q,q,ds.CT,ds.SA,dims,sec_str)
+    
+    return ds_Q,ds_q
 
 ### visualisation functions
 

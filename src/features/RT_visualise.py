@@ -130,11 +130,11 @@ def plot_extr_patch(ds1,ax,plot_mean=True,dim='TIME'):
             
     ax.set_ylim(ylim)
 
-def plot_moorings_paper(ds_RT,ds_RT_stacked):
+def plot_moorings_paper(ds_RT,ds_RT_stacked,cruise_label=True):
     
     ds_cruises = rtd.load_cruise_list()
     
-    fs=14
+    fs=15
     font = {'weight' : 'normal',
             'size'   : fs}
     plt.rc('font', **font)
@@ -143,7 +143,7 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
     vel_lev = np.arange(-.5,.55,.1)
     tem_levs = np.arange(0,15,1)
     sal_levs = np.arange(35,35.7,.1)
-    fig,axs = plt.subplots(3,2,figsize=[19,12],sharex=True,sharey=True)
+    fig,axs = plt.subplots(3,2,figsize=[14,9],sharex=True,sharey=True)
 
     # EB1
     sigma = gsw.sigma0(ds_RT.SG_EAST, ds_RT.TG_EAST)
@@ -155,8 +155,10 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
-    ds_RT_stacked.PS_EAST_1_UV.plot.line('k',ax=ax,x='TIME',hue='ZS_EAST_1_UV',add_legend=False,lw=0.5)
-
+    pres = -1*gsw.z_from_p(ds_RT_stacked.PS_EAST_1_UV, 57.1)
+    pres.plot.line('k',ax=ax,x='TIME',hue='ZS_EAST_1_UV',add_legend=False,lw=0.5)
+    ax.set_ylabel('Depth (m)')
+    
     ax = axs[1,0]
     imT = ds_RT.TG_EAST.plot(ax=ax,x='TIME',yincrease=False,
                        levels=tem_levs,cmap=cm.cm.thermal,
@@ -165,8 +167,10 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
-    ds_RT_stacked.PS_EAST_TS.plot.line('k',ax=ax,x='TIME',hue='ZS_EAST_TS',add_legend=False,lw=0.5)
-
+    pres = -1*gsw.z_from_p(ds_RT_stacked.PS_EAST_TS, 57.1)
+    pres.plot.line('k',ax=ax,x='TIME',hue='ZS_EAST_TS',add_legend=False,lw=0.5)
+    ax.set_ylabel('Depth (m)')
+    
     ax = axs[2,0]
     imS= ds_RT.SG_EAST.plot(ax=ax,x='TIME',yincrease=False,
                         levels=sal_levs, cmap=cm.cm.haline,
@@ -175,8 +179,10 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
-    ds_RT_stacked.PS_EAST_TS.plot.line('k',ax=ax,x='TIME',hue='ZS_EAST_TS',add_legend=False,lw=0.5)
-
+    pres = -1*gsw.z_from_p(ds_RT_stacked.PS_EAST_TS, 57.1)
+    pres.plot.line('k',ax=ax,x='TIME',hue='ZS_EAST_TS',add_legend=False,lw=0.5)
+    ax.set_ylabel('Depth (m)')
+    
     # WB1
     sigma = gsw.sigma0(ds_RT.SG_WEST, ds_RT.TG_WEST)
 
@@ -191,8 +197,10 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
-    ds_RT_stacked.PS_WEST_1_UV.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_1_UV',add_legend=False,lw=0.5)
-    ds_RT_stacked.PS_WEST_2_UV.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_2_UV',add_legend=False,lw=0.5)
+    pres = gsw.z_from_p(ds_RT_stacked.PS_WEST_1_UV, 57.1)
+    pres.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_1_UV',add_legend=False,lw=0.5)
+    pres = -1*gsw.z_from_p(ds_RT_stacked.PS_WEST_2_UV, 57.1)
+    pres.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_2_UV',add_legend=False,lw=0.5)
 
     ax = axs[1,1]
     ds_RT.TG_WEST.plot(ax=ax,x='TIME',yincrease=False,
@@ -202,7 +210,8 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
-    ds_RT_stacked.PS_WEST_TS.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_TS',add_legend=False,lw=0.5)
+    pres = -1*gsw.z_from_p(ds_RT_stacked.PS_WEST_TS, 57.1)
+    pres.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_TS',add_legend=False,lw=0.5)
 
     ax = axs[2,1]
     ds_RT.SG_WEST.plot(ax=ax,x='TIME',yincrease=False,
@@ -212,7 +221,8 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
-    ds_RT_stacked.PS_WEST_TS.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_TS',add_legend=False,lw=0.5)
+    pres = -1*gsw.z_from_p(ds_RT_stacked.PS_WEST_TS, 57.1)
+    pres.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_TS',add_legend=False,lw=0.5)
 
 
     for ax in axs[0:,1]:
@@ -220,39 +230,41 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked):
 
     for i, label in enumerate(('a)', 'b)','c)','d)','e)','f)')):
         ax =  axs.flat[i]
-        ax.text(-.05, 1., label, transform=ax.transAxes,
+        ax.text(0, 1.05, label, transform=ax.transAxes,
           fontsize=fs, ha='left',va='bottom')
         ax.vlines(ds_cruises.TIME,0, 1,transform=ax.get_xaxis_transform(),color='k',linestyle='--')
         ax.grid()
         if i<6:
             ax.set_xlabel('')
 
-    for i,text in enumerate(ds_cruises[:-1]):
-        if i==0:
-            t=pd.to_datetime(ds_cruises[i].TIME.values)+datetime.timedelta(days=30)
-            axs[0,0].annotate(text.values, xy=(t,-10),
-                          ha ='right', va='bottom', rotation=-60)
-            axs[0,1].annotate(text.values, xy=(t,-10),
-                              ha ='right', va='bottom', rotation=-60)
-        else:
-            axs[0,0].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
-                              ha ='right', va='bottom', rotation=-60)
-            axs[0,1].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
-                              ha ='right', va='bottom', rotation=-60)
+    if cruise_label:
+        for i,text in enumerate(ds_cruises):
+            if text.TIME.dt.year<=ds_RT.TIME.max().dt.year:
+                if i==0:
+                    t=pd.to_datetime(ds_cruises[i].TIME.values)+datetime.timedelta(days=30)
+                    axs[0,0].annotate(text.values, xy=(t,-10),
+                                  ha ='right', va='bottom', rotation=-60)
+                    axs[0,1].annotate(text.values, xy=(t,-10),
+                                      ha ='right', va='bottom', rotation=-60)
+                else:
+                    axs[0,0].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
+                                      ha ='right', va='bottom', rotation=-60)
+                    axs[0,1].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
+                                      ha ='right', va='bottom', rotation=-60)
 
     plt.tight_layout()
     fig.subplots_adjust(right=0.90)
     cbar_ax = fig.add_axes([0.92, 0.69, 0.02, 0.25])
     cb =fig.colorbar(imV, cax=cbar_ax)
-    cb.set_label('Meridional velocity [m/s]')
+    cb.set_label('Meridional\nvelocity (m s$^{-1}$)')
 
     cbar_ax = fig.add_axes([0.92, 0.38, 0.02, 0.25])
     cb =fig.colorbar(imT, cax=cbar_ax)
-    cb.set_label('Conservative temperature [°C]')
+    cb.set_label(f'Conservative\ntemperature {r'($^{\circ}$C)'}')
 
     cbar_ax = fig.add_axes([0.92, 0.06, 0.02, 0.25])
     cb =fig.colorbar(imS, cax=cbar_ax)
-    cb.set_label('Absolute salinity [g/kg]')
+    cb.set_label('Absolute\nsalinity (g kg$^{-1}$)')
 
     return fig
 

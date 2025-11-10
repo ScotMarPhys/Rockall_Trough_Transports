@@ -79,3 +79,19 @@ def preprocess_ladcp_file(ds,dim='TIME'):
     ds = ds.assign_coords(MAXZ=depth_indices)
     return ds
 
+def load_EEL_stations(file,RT_only=True):
+    # Get position metadata
+    dfs = pd.read_csv(file,sep=',', index_col=None, header=0)
+    # Make sure the station name are sorted by their distance along the section
+    dfs = dfs.rename(columns={"Refdist": "refdist"}).sort_values('refdist', ascending=True)
+    dfs['refdist']=dfs['refdist'].apply(int)
+    dfs=dfs.set_index('refdist')
+    
+    dfs = dfs.to_xarray()
+    if RT_only:
+        # select only RT section
+        RT_west = dfs.swap_dims({'refdist':'Staname'}).sel(Staname='A').refdist
+        RT_east = dfs.swap_dims({'refdist':'Staname'}).sel(Staname='S').refdist
+        dfs = dfs.sel(refdist=slice(RT_west,RT_east))
+    return dfs
+    

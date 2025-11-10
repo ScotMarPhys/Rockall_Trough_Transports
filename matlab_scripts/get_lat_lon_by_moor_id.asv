@@ -1,0 +1,43 @@
+function [latitude, longitude] = get_lat_lon_by_id(targetID)
+% GET_LAT_LON_BY_ID Retrieves the latitude and longitude for a given ID.
+%
+%   [latitude, longitude] = get_lat_lon_by_id(dataTable, targetID)
+%
+%   Inputs:
+%       dataTable - A MATLAB table containing 'ID', 'lat', and 'lon' columns.
+%       targetID  - A string containing the specific ID to search for 
+%                   'RTEB1', 'RTWB2','RTWB1','RHADCP','RTWB','RTADCP'
+%                   'IB5','IB4','IB3','RTEBL1','RTWS','RTES'
+%   Outputs:
+%       latitude  - The latitude value corresponding to the ID.
+%       longitude - The longitude value corresponding to the ID.
+%                   Returns NaN if the ID is not found.
+
+    
+    local_data_path = 'C:\Users\sa07kb\Projects\Rockall_Trough_Transports\data\';
+    local_raw_dir = fullfile([local_data_path,'raw\']);
+    
+    % RT positions
+    RT_loc_fn = 'Ellet_array_mooring_location.csv';
+    RT_file = fullfile(local_raw_dir, RT_loc_fn);
+    dataTable = readtable(RT_file);
+
+
+    % 1. Find the index of the row where the 'ID' column matches the target string
+    %    strcmp compares the targetID string with all entries in the ID column
+    rowIndex = strcmp(dataTable.ID, targetID);
+    
+    % Check if the ID was actually found
+    if any(rowIndex)
+        % 2. Access the 'lat' and 'lon' values using that row index
+        latitude = dataTable.lat(rowIndex);
+        longitude = dataTable.lon(rowIndex);
+    elseif rowIndex=='RTWB'
+      
+    else
+        % Handle case where ID is not found
+        warning('ID "%s" not found in the table.', targetID);
+        latitude = NaN;
+        longitude = NaN;
+    end
+end

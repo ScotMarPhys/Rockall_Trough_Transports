@@ -8,8 +8,9 @@ NX_MB = 100;           % Horizontal grid size in Mid-basin (needed for Ekman cal
 NX_EW = 100;           % Horizontal grid size in Eastern wedge
 SA_ref = 35.34;        % Reference Absolute Salinity (g/kg), for freshwater flux calc
 CT_ref = 7.07;        % Reference Conservative Temperature (C), for heat flux calc
-rhoCp = 4.1e6;        % Constant: Reference density times specific heat capacity (J m^-3 C^-1)   
-rho0 = 1027.4;           % Reference density          
+Cp = 3992;        % Constant: Reference density times specific heat capacity (J m^-3 C^-1)   
+rho0 = 1027.4;           % Reference density
+rhoCp = Cp*rho0;
 Omega = 7.2921e-5; % Earth's rotation
 
 % Praemble for despike time series after vertical extrapolation to surface - velocity

@@ -134,7 +134,7 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked,cruise_label=True):
     
     ds_cruises = rtd.load_cruise_list()
     
-    fs=15
+    fs=14
     font = {'weight' : 'normal',
             'size'   : fs}
     plt.rc('font', **font)
@@ -143,7 +143,8 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked,cruise_label=True):
     vel_lev = np.arange(-.5,.55,.1)
     tem_levs = np.arange(0,15,1)
     sal_levs = np.arange(35,35.7,.1)
-    fig,axs = plt.subplots(3,2,figsize=[14,9],sharex=True,sharey=True)
+    
+    fig,axs = plt.subplots(3,2,figsize=[12,10],sharex=True,sharey=True)
 
     # EB1
     sigma = gsw.sigma0(ds_RT.SG_EAST, ds_RT.TG_EAST)
@@ -227,8 +228,10 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked,cruise_label=True):
 
     for ax in axs[0:,1]:
         ax.set_ylabel('')
+    for ax in axs.flat:
+        ax.tick_params(axis='x', labelrotation=45) 
 
-    for i, label in enumerate(('a)', 'b)','c)','d)','e)','f)')):
+    for i, label in enumerate(('(a)', '(b)','(c)','(d)','(e)','(f)')):
         ax =  axs.flat[i]
         ax.text(0, 1.05, label, transform=ax.transAxes,
           fontsize=fs, ha='left',va='bottom')
@@ -254,22 +257,22 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked,cruise_label=True):
 
     plt.tight_layout()
     fig.subplots_adjust(right=0.90)
-    cbar_ax = fig.add_axes([0.92, 0.69, 0.02, 0.25])
+    cbar_ax = fig.add_axes([0.92, 0.70, 0.02, 0.245])
     cb =fig.colorbar(imV, cax=cbar_ax)
     cb.set_label('Meridional\nvelocity (m s$^{-1}$)')
 
-    cbar_ax = fig.add_axes([0.92, 0.38, 0.02, 0.25])
+    cbar_ax = fig.add_axes([0.92, 0.39, 0.02, 0.245])
     cb =fig.colorbar(imT, cax=cbar_ax)
     cb.set_label(f'Conservative\ntemperature {r'($^{\circ}$C)'}')
 
-    cbar_ax = fig.add_axes([0.92, 0.06, 0.02, 0.25])
+    cbar_ax = fig.add_axes([0.92, 0.08, 0.02, 0.245])
     cb =fig.colorbar(imS, cax=cbar_ax)
     cb.set_label('Absolute\nsalinity (g kg$^{-1}$)')
 
     return fig
 
 ##########################################################
-def plot_moorings_paper_A(ds_RT,ds_RT_stacked):
+def plot_moorings_paper_A(ds_RT,ds_RT_stacked,cruise_label=True):
     
     ds_cruises = rtd.load_cruise_list()
     
@@ -283,20 +286,10 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked):
     tem_levs = np.arange(-1.5,1.52,.25)
     sal_levs = np.arange(-0.15,0.152,0.025)
     
-    fig,axs = plt.subplots(2,2,figsize=[19,8],sharex=True,sharey=True)
+    fig,axs = plt.subplots(2,2,figsize=[12,7],sharex=True,sharey=True)
 
 #     # EB1
     sigma = gsw.sigma0(ds_RT.SG_EAST, ds_RT.TG_EAST)
-#     ax = axs[0,0]
-#     da = (ds_RT.V_EAST*1e-2)
-#     imV = (da-da.mean('TIME')).plot(ax=ax,x='TIME',yincrease=False,
-#                        levels=vel_lev,cmap=cm.cm.balance,
-#                        add_colorbar=False)
-#     p=sigma.plot.contour(ax=ax,x='TIME',
-#                         levels=sig_lev,colors='grey',
-#                         yincrease=False,linewidths=1)
-#     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
-#     ds_RT_stacked.PS_EAST_1_UV.plot.line('k',ax=ax,x='TIME',hue='ZS_EAST_1_UV',add_legend=False,lw=0.5)
 
     ax = axs[0,0]
     da = ds_RT.TG_EAST
@@ -327,18 +320,6 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked):
     ds_RT = rtf.merge_RT_WB1_2(ds_RT)
 
     ax = axs[0,1]
-#     da = (ds_RT.v_RTWB*1e-2)
-#     imV = (da-da.mean('TIME')).plot(ax=ax,x='TIME',yincrease=False,
-#                        levels=vel_lev,cmap=cm.cm.balance,
-#                        add_colorbar=False)
-#     p=sigma.plot.contour(ax=ax,x='TIME',
-#                         levels=sig_lev,colors='grey',
-#                         yincrease=False,linewidths=1)
-#     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
-#     ds_RT_stacked.PS_WEST_1_UV.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_1_UV',add_legend=False,lw=0.5)
-#     ds_RT_stacked.PS_WEST_2_UV.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_2_UV',add_legend=False,lw=0.5)
-
-#     ax = axs[1,1]
     da = ds_RT.TG_WEST
     (da-da.mean('TIME')).plot(ax=ax,x='TIME',yincrease=False,
                        levels=tem_levs,cmap=cm.cm.balance,
@@ -363,8 +344,10 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked):
 
     for ax in axs[0:,1]:
         ax.set_ylabel('')
+    for ax in axs.flat:
+        ax.tick_params(axis='x', labelrotation=45)
 
-    for i, label in enumerate(('a)', 'b)','c)','d)')):
+    for i, label in enumerate(('(a)', '(b)','(c)','(d)')):
         ax =  axs.flat[i]
         ax.text(-.05, 1., label, transform=ax.transAxes,
           fontsize=fs, ha='left',va='bottom')
@@ -372,19 +355,20 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked):
         ax.grid()
         if i<6:
             ax.set_xlabel('')
-
-    for i,text in enumerate(ds_cruises[:-1]):
-        if i==0:
-            t=pd.to_datetime(ds_cruises[i].TIME.values)+datetime.timedelta(days=30)
-            axs[0,0].annotate(text.values, xy=(t,-10),
-                          ha ='right', va='bottom', rotation=-60)
-            axs[0,1].annotate(text.values, xy=(t,-10),
+    
+    if cruise_label:
+        for i,text in enumerate(ds_cruises[:-1]):
+            if i==0:
+                t=pd.to_datetime(ds_cruises[i].TIME.values)+datetime.timedelta(days=30)
+                axs[0,0].annotate(text.values, xy=(t,-10),
                               ha ='right', va='bottom', rotation=-60)
-        else:
-            axs[0,0].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
-                              ha ='right', va='bottom', rotation=-60)
-            axs[0,1].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
-                              ha ='right', va='bottom', rotation=-60)
+                axs[0,1].annotate(text.values, xy=(t,-10),
+                                  ha ='right', va='bottom', rotation=-60)
+            else:
+                axs[0,0].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
+                                  ha ='right', va='bottom', rotation=-60)
+                axs[0,1].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
+                                  ha ='right', va='bottom', rotation=-60)
 
     plt.tight_layout()
     fig.subplots_adjust(right=0.90)
@@ -465,14 +449,105 @@ def plot_RT_mean_sections_from_mooring(ds_q_RT,ds_RT_loc):
         ax.set_ylim([2300,0])
         
     return fig
+##########################################################################################
 
-###########################################################################################
-def plot_EOF_HEOF(model_EOF,model_HEOF,ds_RT_loc,dim,TIME_dim='TIME'):
-    fs = 18
+def plot_EOF(model_EOF,v_mean,ds_RT_loc,dim,TIME_dim='TIME'):
+    
+    fs = 14
     font = {'weight' : 'normal',
         'size'   : fs}
     plt.rc('font', **font)
+    #axis_lat_lon_formatter(ax,form='xlon')
+    xticks_EW = np.arange(-9.5,ds_RT_loc.lon_RTES,.1)
+    xticklabels_EW = ['9.5°W','9.4°W','9.3°W','9.2°W']
+
+    expvar = model_EOF.explained_variance()
+    expvar_ratio = model_EOF.explained_variance_ratio()
+    components = model_EOF.components()
+
+    fig,axs = plt.subplots(1,components.mode.size+1,
+                           figsize=[12,4],sharey=True,sharex=True)
+
+    ax = axs[0]
+    vmin,vmax,levs=-0.2,0.2,21
+    im_hdl_1 = v_mean.plot(x=dim,ax=ax,yincrease=False,add_colorbar=False,
+                vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+    ax.set_ylabel('Depth [m]', fontsize=fs)   
+
+
+    for i,ax in enumerate(axs[1:]):
+        vmin,vmax,levs=-0.02,0.02,21
+        im_hdl = components.isel(mode=i).plot(x=dim,ax=ax,add_colorbar=False,
+                    vmin=vmin,vmax=vmax,levels=levs,cmap='PiYG',yincrease=False)
+
+        ax.text(0.99, 0.05,f'EOF {i+1} \nExpl. Var.\n {(expvar_ratio * 100).round(0).values[i]:.0f}%',
+                transform=ax.transAxes, fontsize=fs,
+                 verticalalignment='bottom',horizontalalignment='right')
+        components.isel(mode=i).plot.contour(ax=ax,x=dim,colors='w',linewidths=.5,yincrease=False,
+                                                           vmin=vmin,vmax=vmax,levels=levs)
+        
+        ax.set_title('')
+        ax.set_ylabel('')      
+   
+    for ax in axs.flat:
+        ax.grid()
+        ax.set_xlabel('')
+        ax.set_xticks(xticks_EW)
+        ax.set_xlim([ds_RT_loc.lon_RTEB-0.01,ds_RT_loc.lon_RTES+0.01])
+        axis_lat_lon_formatter(ax,form='xlon')
+        ax.tick_params(axis='x', labelrotation=25)
+
+        ax.vlines(ds_RT_loc.lon_RTADCP,700,50,color='k',ls=':',lw=3)
+        ax.plot(ds_RT_loc.lon_RTADCP,50, marker='s', 
+                markerfacecolor='b', 
+                markeredgecolor='w',     # White border
+                markersize=10, 
+                mew=2.5)
+        
+        ax.vlines(ds_RT_loc.lon_RTEB,1000,50,color='k',ls=':',lw=3)
+        ax.plot(ds_RT_loc.lon_RTEB,50,marker='o', 
+                markerfacecolor='lime', 
+                markeredgecolor='k',     # White border
+                markersize=12,
+                mew=2.5)
+        
+        ax.vlines(ds_RT_loc.lon_RTES,200,50,color='k',ls=':',lw=3)
+        ax.plot(ds_RT_loc.lon_RTES,50,marker='^', 
+                markerfacecolor='r', 
+                markeredgecolor='k',     # White border
+                markersize=12,
+                mew=2)
     
+    for i, label in enumerate(('(a)','(b)','(c)','(d)')):
+        ax =  axs.flat[i]
+        ax.text(0.05, 1.02, label, transform=ax.transAxes,
+          fontsize=fs, ha='left',va='bottom')
+    
+    plt.tight_layout()
+    fig.subplots_adjust(bottom=0.30)
+    cbar_ax_shared = fig.add_axes([0.37, 0.08, 0.55, 0.04]) 
+    fig.colorbar(im_hdl, cax=cbar_ax_shared, 
+                 orientation='horizontal', label='Amplitude')
+    
+    # [left, bottom, width, height]
+    cbar_ax_1 = fig.add_axes([0.05, 0.08, 0.25, 0.04]) 
+    cb1 = fig.colorbar(im_hdl_1, cax=cbar_ax_1, 
+                 orientation='horizontal', 
+                 label='Meridional velocity (m s$^{-1}$)')
+
+    major_tick_locations =  [-.2, -.1, 0, .1, .2] 
+    cb1.ax.xaxis.set_major_locator(ticker.FixedLocator(major_tick_locations))
+    cb1.ax.minorticks_on()
+    
+    return fig
+
+###########################################################################################
+def plot_EOF_HEOF(model_EOF,model_HEOF,ds_RT_loc,dim,TIME_dim='TIME'):
+    fs = 14
+    font = {'weight' : 'normal',
+        'size'   : fs}
+    plt.rc('font', **font)
+    #axis_lat_lon_formatter(ax,form='xlon')
     xticks_EW = np.arange(-9.5,ds_RT_loc.lon_RTES,.1)
     xticklabels_EW = ['9.5°W','9.4°W','9.3°W','9.2°W']
 

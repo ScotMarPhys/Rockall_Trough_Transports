@@ -435,3 +435,60 @@ def plot_seasonal_cycle_Q(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False,show_l
     if show_xl:
         ax.set_xlabel('Month of year')
     ax.set_ylabel(f'{Q_glider.long_name} [{Q_glider.units}]')
+
+
+###################################################################
+def resample_to_glider_data(v_RTEB1,ds_glider,win_days = 1,t_dim='TIME',v='v'):
+    # Aerage regular mooring dataset onto the irregular time steps of glider dataset
+    # using a window of ±1 day
+    v_RTEB1=v_RTEB1.rename({t_dim:'time'})
+    
+    # 2. Define the averaging window (±win_days day)
+    window_size = pd.Timedelta(days=win_days)
+    
+    # 3. Create an empty list to hold the averaged results
+    averaged_values = []
+    
+    # 4. Loop through each irregular time step
+    for t_irreg in ds_glider.time.values:
+        # Define the time window for the regular data
+        start_time = t_irreg - window_size
+        end_time = t_irreg + window_size
+    
+        # Select the regular data within the window
+        # .sel(time=slice(start_time, end_time)) is the key step
+        data_in_window = v_RTEB1.sel(time=slice(start_time, end_time))
+        
+        # Check if there is any data in the window to avoid issues with empty selections
+        if data_in_window.size > 0:
+            # Average the data in the window
+            average_value = data_in_window.mean(dim='time')
+            averaged_values.append(average_value.values)
+        else:
+            # Append NaN if no data is found for a given time window
+            averaged_values.append(np.nan)
+    
+    # 5. Create a new xarray DataArray with the averaged values
+    if v=='v':
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            coords={'time': ds_glider.time,
+                   'depth': v_RTEB1.depth*-1,
+                   'PRES': v_RTEB1.PRES},
+            dims=['time','depth']
+        )
+    elif v=='m':
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            coords={'time': ds_glider.time,
+                   'mode': v_RTEB1.mode},
+            dims=['time','mode']
+        )
+    else:
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            coords={'time': ds_glider.time},
+            dims=['time']
+        )
+        
+    return v_RTEB1_resampled

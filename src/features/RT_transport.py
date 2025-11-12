@@ -543,9 +543,9 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
     ds_glider = ds_glider.interp(depth=('depth',ds_RT.depth.data)).rename({'time':'TIME'})
     
     # Calculate glider EOF
-    v_anomaly = ds_glider.vcur.resample(TIME="15D").mean()
+    v_anomaly = ds_glider.vcur
     v_anomaly = v_anomaly - v_anomaly.mean('TIME',keep_attrs=True)
-    glider_EOF = rt_eof.EOF_func(v_anomaly,n_modes=1,plot_out=False,dim='lon',TIME_dim='TIME')
+    glider_EOF = rt_eof.EOF_func(v_anomaly,n_modes=2,plot_out=False,dim='lon',TIME_dim='TIME')
     
     # Get RTEB1 meridional velocity
     v_RTEB1=(ds_RT.V_EAST/1e2)
@@ -559,7 +559,7 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
                         lon=[ds_RT_loc.lon_RTADCP],method='nearest').data,
                         latitude=ds_RT_loc.lat_RTADCP,
                         time=('time',v_RTEB1.TIME.data),
-                        depth=('depth',v_RTEB1.depth.data)) + rtp.corr_model
+                        depth=('depth',v_RTEB1.depth.data))
 
     # Duplicate top GLORYS-ADCP values
     mask = v_GLO_RTADCP
@@ -570,10 +570,11 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
 
     # combinde both to one matrix (time,depth,lon)
     ds_y = xr.concat([v_RTEB1,v_GLO_RTADCP], dim="lon")
+    ds_y = ds_y.sel(depth=ds_glider.depth)
     ds_y['lon']=glider_locs.lon.data
 
     # Remove glider sections temporal mean from y
-    ds_y = (ds_y-glider_locs).compute()
+    ds_y = (ds_y-ds_y.mean('TIME')).compute()
 
     # get EOF components at mooring positions as X for linear regression (X'X*alpha=X'y)
     # initial X matrix (mode,lon,depth)
@@ -582,6 +583,7 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
 
     # get alpha & reconstruct velocity fields
     v_rec = rt_eof.rec_v_sec(ds_X,ds_y,glider_EOF,ds_glider.vcur,TIME_dim='TIME')
+    v_rec = v_rec.sel(mode=2)
 
     zlim = v_rec.depth.where(v_rec.notnull()).max()
     (v_EW,_) = xr.broadcast(v_RTEB1,v_rec.lon)

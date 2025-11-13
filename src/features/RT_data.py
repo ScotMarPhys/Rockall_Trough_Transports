@@ -35,6 +35,8 @@ def load_RT_moor(file_name_in_grid):
             print(f"Error accessing or saving dataset from {opendap_url}: {e}")
     return ds_RT
 
+
+
 def load_glorys(moor,tmin,tmax,dx=.5,dy=.5,zmin=0,zmax=1000):
     GLORYS_data_path = (sps.raw_data_dir/'data_GLORYS')
     GLORYS_data_path.mkdir(parents=True, exist_ok=True)

@@ -316,6 +316,106 @@ def plot_linregress(var_1, var_2,axs=0,t_dim='TIME',
     axs.axvline(0,color='k',lw=0.8,ls='--')
     axs.axhline(0,color='k',lw=0.8,ls='--')
 
+#####################
+def plot_error_paper(da_Q_obs,da_Q_rec,mode,axs,fig,var_str='Q',title_str='EW',t_dim='TIME'):
+    if var_str=='Q':
+        unit_str = 'Sv'    
+    elif var_str=='Qh':
+        unit_str = 'PW'    
+    elif var_str=='Qf':
+        unit_str = 'Sv'
+    elif var_str=='CT':
+        unit_str = r'$\degree$C'
+    elif var_str=='SA':
+        unit_str = 'g/kg'
+    
+    
+    if mode==0:
+        Q_rec = da_Q_rec
+        result = scipy.stats.linregress(Q_rec,da_Q_obs)
+        RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
+        axs.plot(Q_rec,da_Q_obs,'.',
+             label=f'{title_str}R={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE {result.stderr:3.2f},\np={result.pvalue:.3f}')
+    else:
+        for i in range(mode):
+            Q_rec = da_Q_rec.isel(mode=i)
+            result = scipy.stats.linregress(Q_rec,da_Q_obs)
+            RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
+            if i==0:
+                axs.plot(da_Q_obs,Q_rec,'.',
+                         label=f'{title_str}{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f}, \np={result.pvalue:.3f} ')
+            else:
+                axs.plot(da_Q_obs,Q_rec,'.',
+                     label=f'{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f}, \np={result.pvalue:.3f} ')
+    
+    axs.plot(np.arange(-50,50),np.arange(-50,50),color='k',lw=0.8,ls='--')
+    if var_str=='Q':
+        axs.set_ylabel('Observed transport (Sv)')
+        axs.set_xlabel('Reconstructed transport (Sv)')
+        axs.set_ylim([-8,8])
+        axs.set_xlim([-8,8])
+        
+    if var_str=='Qh':
+        axs.set_ylabel('Observed heat transport')
+        axs.set_xlabel('Reconstructed heat transport')
+        axs.set_ylim([-6,6]*1e-2)
+        axs.set_xlim([-6,6]*1e-2)
+        
+    if var_str=='Qf':
+        axs.set_ylabel('Observed transport')
+        axs.set_xlabel('Reconstructed transport')
+        axs.set_ylim([-4,4]*1e-2)
+        axs.set_xlim([-4,4]*1e-2)
+    elif var_str=='CT':
+        axs.set_ylabel('Observed CT')
+        axs.set_xlabel('Reconstructed CT')
+        axs.set_ylim([7,12.5])
+        axs.set_xlim([7,12.5])
+    elif var_str=='SA':
+        axs.set_ylabel('Observed SA')
+        axs.set_xlabel('Reconstructed SA')
+        axs.set_ylim([35.3,35.6])
+        axs.set_xlim([35.3,35.6])
+    
+    # # --- Robust Legend Placement Logic ---
+    # spec = axs.get_subplotspec()
+    # is_left_col = spec.is_first_col()
+    # is_top_row = spec.is_first_row()
+
+    # # Define vertical anchor and location
+    # if is_top_row:
+    #     # Top row: Anchor legend to the bottom of the legend box
+    #     vertical_anchor = 0     # bbox Y coordinate
+    #     vertical_loc = 'lower'  # loc setting (e.g., 'lower left')
+    # else:
+    #     # Bottom row: Anchor legend to the top of the legend box
+    #     vertical_anchor = 1     # bbox Y coordinate
+    #     vertical_loc = 'upper'  # loc setting (e.g., 'upper left')
+    
+    # # Define horizontal anchor and location
+    # if is_left_col:
+    #     # Left column: Place legend to the left side
+    #     horizontal_anchor = -0.3
+    #     horizontal_loc = 'right' # e.g., 'lower right' or 'upper right'
+    # else:
+    #     # Right column: Place legend to the right side
+    #     horizontal_anchor = 1.05
+    #     horizontal_loc = 'left' # e.g., 'lower left' or 'upper left'
+
+    # # Combine horizontal and vertical loc strings (e.g., 'upper left')
+    # final_loc = f'{vertical_loc} {horizontal_loc}'
+
+    # # Place the legend
+    # axs.legend(bbox_to_anchor=(horizontal_anchor, vertical_anchor), 
+    #            loc=final_loc)
+
+    axs.legend(bbox_to_anchor=(0, -.2), loc='upper left')
+    axs.set_aspect('equal', adjustable='box')
+    axs.grid()
+    axs.axvline(0,color='k',lw=0.8,ls='--')
+    axs.axhline(0,color='k',lw=0.8,ls='--')
+
+#####################
 def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW',t_dim='TIME'):
     if var_str=='Q':
         unit_str = 'Sv'    
@@ -333,45 +433,50 @@ def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW',t_dim='TIME
         Q_rec = da_Q_rec
         result = scipy.stats.linregress(Q_rec,da_Q_obs)
         RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
-        axs.plot(da_Q_obs,Q_rec,'.',
-             label=f'EW-F22, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} ')
+        axs.plot(Q_rec,da_Q_obs,'.',
+             label=f'{title_str}R={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE {result.stderr:3.2f},\np={result.pvalue:.3f}')
     else:
         for i in range(mode):
             Q_rec = da_Q_rec.isel(mode=i)
             result = scipy.stats.linregress(Q_rec,da_Q_obs)
             RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
-            axs.plot(da_Q_obs,Q_rec,'.',
-                     label=f'{title_str}, {Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} ')
+            if i==0:
+                axs.plot(da_Q_obs,Q_rec,'.',
+                         label=f'{title_str}{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f}, \np={result.pvalue:.3f} ')
+            else:
+                axs.plot(da_Q_obs,Q_rec,'.',
+                     label=f'{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f}, \np={result.pvalue:.3f} ')
     
     axs.plot(np.arange(-50,50),np.arange(-50,50),color='k',lw=0.8,ls='--')
     if var_str=='Q':
-        axs.set_xlabel('Observed transport')
-        axs.set_ylabel('Reconstructed transport')
+        axs.set_ylabel('Observed transport')
+        axs.set_xlabel('Reconstructed transport')
         axs.set_ylim([-8,8])
         axs.set_xlim([-8,8])
         
     if var_str=='Qh':
-        axs.set_xlabel('Observed heat transport')
-        axs.set_ylabel('Reconstructed heat transport')
+        axs.set_ylabel('Observed heat transport')
+        axs.set_xlabel('Reconstructed heat transport')
         axs.set_ylim([-6,6]*1e-2)
         axs.set_xlim([-6,6]*1e-2)
         
     if var_str=='Qf':
-        axs.set_xlabel('Observed transport')
-        axs.set_ylabel('Reconstructed transport')
+        axs.set_ylabel('Observed transport')
+        axs.set_xlabel('Reconstructed transport')
         axs.set_ylim([-4,4]*1e-2)
         axs.set_xlim([-4,4]*1e-2)
     elif var_str=='CT':
-        axs.set_xlabel('Observed CT')
-        axs.set_ylabel('Reconstructed CT')
+        axs.set_ylabel('Observed CT')
+        axs.set_xlabel('Reconstructed CT')
         axs.set_ylim([7,12.5])
         axs.set_xlim([7,12.5])
     elif var_str=='SA':
-        axs.set_xlabel('Observed SA')
-        axs.set_ylabel('Reconstructed SA')
+        axs.set_ylabel('Observed SA')
+        axs.set_xlabel('Reconstructed SA')
         axs.set_ylim([35.3,35.6])
         axs.set_xlim([35.3,35.6])
-    axs.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    axs.legend(bbox_to_anchor=(-0.05, 1), loc='upper right')
     axs.set_aspect('equal', adjustable='box')
     axs.grid()
     axs.axvline(0,color='k',lw=0.8,ls='--')

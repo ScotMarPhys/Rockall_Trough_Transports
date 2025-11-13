@@ -27,6 +27,79 @@ import src.features.matfile_functions as matlab_fct
 import src.features.RT_EOF_functions as rt_eof
 
 
+def print_rt_parameters_gsw(ds_RT: xr.Dataset):
+    """
+    Calculates and prints derived parameters from the ds_RT dataset 
+    using the gsw library, accounting for PRES as a coordinate.
+
+    Assumes ds_RT contains SG_EAST, TG_EAST, SG_WEST, TG_WEST data variables 
+    and PRES as a coordinate.
+
+    Args:
+        ds_RT: An xarray Dataset containing required variables and coordinates.
+    """
+    
+    required_vars = ['SG_EAST', 'TG_EAST', 'SG_WEST', 'TG_WEST']
+    required_coords = ['PRES']
+    
+    if not all(v in ds_RT.data_vars for v in required_vars):
+        print(f"Error: Input dataset is missing one or more required data variables: {required_vars}")
+        return
+    if not all(c in ds_RT.coords for c in required_coords):
+        print(f"Error: Input dataset is missing required coordinate: {required_coords}")
+        return
+
+    # --- Calculate GSW properties for East and West sides ---
+    # xarray will handle broadcasting ds_RT.PRES for calculations
+    
+    # East Side Calculations
+    t_east = gsw.t_from_CT(ds_RT['SG_EAST'], ds_RT['TG_EAST'], ds_RT.PRES)
+    cp_east = gsw.cp_t_exact(ds_RT['SG_EAST'], t_east, ds_RT.PRES)
+    sigma_east = gsw.sigma0(ds_RT['SG_EAST'], ds_RT['TG_EAST']) # Sigma0 uses 0 dbar reference pressure
+
+    # West Side Calculations
+    t_west = gsw.t_from_CT(ds_RT['SG_WEST'], ds_RT['TG_WEST'], ds_RT.PRES)
+    cp_west = gsw.cp_t_exact(ds_RT['SG_WEST'], t_west, ds_RT.PRES)
+    sigma_west = gsw.sigma0(ds_RT['SG_WEST'], ds_RT['TG_WEST'])
+
+    # Combine data for overall stats calculation across both regions
+    all_TG = xr.concat([ds_RT['TG_EAST'], ds_RT['TG_WEST']], dim='combined_data')
+    all_SA = xr.concat([ds_RT['SG_EAST'], ds_RT['SG_WEST']], dim='combined_data')
+    all_CP = xr.concat([cp_east, cp_west], dim='combined_data')
+    all_Sigma = xr.concat([sigma_east, sigma_west], dim='combined_data')
+
+
+    # --- Calculate intermediate summary values (Max/Min/Mean for suggestions) ---
+    max_CP = all_CP.max().values
+    max_SA = all_SA.max().values
+    min_CT = all_TG.min().values # Renamed CT in output for clarity (Conservative Temperature)
+    mean_rho0 = all_Sigma.mean().values + 1000 # Add 1000 back to anomaly for rho0
+    
+    # --- Print statistics (Max, Min, Mean) ---
+    print("\n--- EAST - Data Statistics (Max, Min, Mean) ---")
+    print(f"CT        | Max: {ds_RT['TG_EAST'].max().values:6.3f} | Min: {ds_RT['TG_EAST'].min().values:6.3f} | Mean: {ds_RT['TG_EAST'].mean().values:.3f}")
+    print(f"SA        | Max: {ds_RT['SG_EAST'].max().values:6.3f} | Min: {ds_RT['SG_EAST'].min().values:6.3f} | Mean: {ds_RT['SG_EAST'].mean().values:.3f}")
+    print(f"CP        | Max: {cp_east.max().values:6.1f} | Min: {cp_east.min().values:6.1f} | Mean: {cp_east.mean().values:.1f}")
+    print(f"Sigma0    | Max: {sigma_east.max().values:6.3f} | Min: {sigma_east.min().values:6.3f} | Mean: {sigma_east.mean().values:.3f}")
+
+ # --- Print statistics (Max, Min, Mean) ---
+    print("\n--- WEST - Data Statistics (Max, Min, Mean) ---")
+    print(f"CT        | Max: {ds_RT['TG_WEST'].max().values:6.3f} | Min: {ds_RT['TG_WEST'].min().values:6.3f} | Mean: {ds_RT['TG_WEST'].mean().values:.3f}")
+    print(f"SA        | Max: {ds_RT['SG_WEST'].max().values:6.3f} | Min: {ds_RT['SG_WEST'].min().values:6.3f} | Mean: {ds_RT['SG_WEST'].mean().values:.3f}")
+    print(f"CP        | Max: {cp_west.max().values:6.1f} | Min: {cp_west.min().values:6.1f} | Mean: {cp_west.mean().values:.1f}")
+    print(f"Sigma0    | Max: {sigma_west.max().values:6.3f} | Min: {sigma_west.min().values:6.3f} | Mean: {sigma_west.mean().values:.3f}")
+
+
+    # --- Print Parameter Suggestions ---
+    print("\n--- Parameter Suggestions ---")
+    print("Please set the following parameters in the /scr/RT_parameter.py:")
+    
+    # Use f-string formatting for rounding as requested
+    print(f"SA_ref={max_SA:.2f}     # Reference Absolute Salinity (g/kg) defined as max")
+    print(f"CT_ref={min_CT:.2f}      # Reference Conservative Temperature (C) defined as min")
+    print(f"Cp={max_CP:.0f}          # Constant:Specific heat capacity (J kg^-1 C^-1) defined as max")
+    print(f"rho0={mean_rho0:.1f}      # Reference density kg m^-3 defined as mean")
+
 # Get dx
 def get_dx(lon,lat,dim='lon'):
     

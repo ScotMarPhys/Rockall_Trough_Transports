@@ -6,10 +6,10 @@ lon_cutoff_WW = -12.906; % Longitude limit of upper-left corner cutout
 NX_WW = 100;            % Horizontal grid size in Western wedge
 NX_MB = 100;           % Horizontal grid size in Mid-basin (needed for Ekman calc.)
 NX_EW = 100;           % Horizontal grid size in Eastern wedge
-SA_ref = 35.34;        % Reference Absolute Salinity (g/kg), for freshwater flux calc
-CT_ref = 7.07;        % Reference Conservative Temperature (C), for heat flux calc
-Cp = 3992;        % Constant: Reference density times specific heat capacity (J m^-3 C^-1)   
-rho0 = 1027.4;           % Reference density
+SA_ref = 35.72;        % Reference Absolute Salinity (g/kg) defined as max
+CT_ref = 3.11;        % Reference Conservative Temperature (C) defined as min
+Cp = 3991;        % Constant:Specific heat capacity (J kg^-1 C^-1) defined as max, 1 atmos
+rho0 = 1027.5;           % Reference density kg m^-3 defined as mean
 rhoCp = Cp*rho0;
 Omega = 7.2921e-5; % Earth's rotation
 

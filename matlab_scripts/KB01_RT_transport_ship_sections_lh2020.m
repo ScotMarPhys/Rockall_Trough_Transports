@@ -165,43 +165,6 @@ area_w = calculate_deep_area(lat_MB(idx_w), lon_MB(idx_w), ...
 disp(['Total returned area in main script: ', num2str((area_e+area_w)*1e-6), ' km^2']);
 disp(['A current of 5mm translates to an error of ', num2str((area_e+area_w)*0.005*1e-6), ' Sv']);
 
-%% Start with mid-basin transports
-lon_w = RT_loc.RTWB.lon;
-lon_e = RT_loc.RTEB1.lon;
-ladcp_MB = select_ladcp_lon_range(ladcp, lon_w-0.2, lon_e+0.2)
-
-for i=1:17;
-    figure(1)
-    contourf(ladcp_MB.lon(:),ladcp_MB.depth(:),squeeze(ladcp_MB.v(:,:,i))')
-    xline([lon_w lon_e], ':', 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5);
-    xlim()
-    axis ij
-end
-
-% grid data 
-% [dist,angle] = sw_dist(cast_lat_sorted,cast_lon_sorted,'km');
-% cast_cumdist = [0 ;cumsum(dist)];
-% [x,y] = meshgrid(cast_cumdist,new_z);
-% [xi,yi] = meshgrid(cast_cumdist(1):5:cast_cumdist(end),new_z);
-% lon1 = interp1(cast_cumdist,cast_lon_sorted,xi(1,:));
-% lat1 = interp1(cast_cumdist,cast_lat_sorted,xi(1,:));
-% uu_1 = griddata(x,y,u_ladcp_sorted,xi,yi,'linear');
-% vv_1 = griddata(x,y,v_ladcp_sorted,xi,yi,'linear');
-% vvct_1 = griddata(x,y,vct_ladcp_sorted,xi,yi,'linear');
-% stduu_1 = griddata(x,y,stdu_ladcp_sorted,xi,yi,'linear');
-% stdvv_1 = griddata(x,y,stdv_ladcp_sorted,xi,yi,'linear');
-% stdvvct_1 = griddata(x,y,stdvct_ladcp_sorted,xi,yi,'linear');
-% SEuu_1 = griddata(x,y,SEu_ladcp_sorted,xi,yi,'linear');
-% SEvv_1 = griddata(x,y,SEv_ladcp_sorted,xi,yi,'linear');
-% SEvvct_1 = griddata(x,y,SEvct_ladcp_sorted,xi,yi,'linear');
-
-dx = gsw_distance(lon_MB, lat_MB);
-dx = ([0,dx]+[dx,0])/2;
-dz = diff(z_grid);
-dz = ([0,dz]+[dz,0])/2;
-
-
-
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT Mean Section Meridional velocity
@@ -408,3 +371,50 @@ grid on
 
 drawnow;
 print(gcf,'-dpng','-r300',[pathfig filesep 'mean_vcur_' figname])
+
+%% %%%%%
+ladcp_gridded = regrid_ladcp_structure(ladcp)
+
+%%
+% Start with mid-basin transports
+lon_w = RT_loc.RTWB.lon;
+lon_e = RT_loc.RTEB1.lon;
+z_lim = 1760;
+year_idx = [1,7,8,13:17];
+
+ladcp_MB = select_ladcp_lon_range(ladcp_gridded, ...
+    lon_w, lon_e,z_lim,year_idx);
+    
+figure(7)
+for i=1:length(year_idx);
+    subplot(3,3,i)
+    contourf(ladcp_MB.lon(:),ladcp_MB.depth(:),squeeze(ladcp_MB.v(:,:,i)))
+    xline([lon_w lon_e], ':', 'Color', [0.5 0.5 0.5], 'LineWidth', 1);
+    axis ij
+end
+
+%%
+dz = diff(ladcp_MB.depth);
+dz = ([0,dz]+[dz,0])/2;
+
+dx = diff(ladcp_MB.cumdist);
+dx = ([0,dx']+[dx',0])/2;
+
+
+
+
+% % Transport in each cell
+% q_WW = RT_hor_grid.dx_WW*ds_RT.dz*(v_WW)
+% 
+% % calculations
+% qh = rtp.rhoCp*q*(CT - rtp.CT_ref);
+% qf = -1*q*(SA - rtp.SA_ref)/rtp.SA_ref;
+% qS = q*SA/rtp.rho0;
+% 
+% mask = q.notnull()
+% qCT = (CT*q.notnull()).where(mask);
+% qSA = (SA*q.notnull()).where(mask);
+% 
+% Qh = qh.sum(dims)/1e15;
+% Qf = qf.sum(dims)/1e6;
+% QS = qS.sum(dims)/1e3;

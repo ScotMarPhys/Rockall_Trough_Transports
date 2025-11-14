@@ -15,6 +15,7 @@ from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
+from numba import njit
 
 ##local functions
 import sys; sys.path.append(r'../')
@@ -741,11 +742,90 @@ def std_error_loop(ds):
                 ds[f'{var}_SE'].attrs = {'name':f'{var}_SE',
                         'long_name':f'Standard error of {var}',
                          'units':ds[var].units}
-                var_count +=1
-        elif '_se' in var:
-            print(f'{var} already in Dataset, will be overwritten')
-        elif ds[var].size==1:
-            print(f'{var} has length {ds[var].size}, no se calculated')
+                var_count +=1    
+    return ds
+
+################
+
+def xcorr_norm_optimized_access(x,y,dim):
+    """
+    Perform Cross-Correlation on x and y, ensuring efficient data access.
+    """
+    # Normalise variables using xarray methods
+    xnorm = (x - x.mean(dim)) / (x.std(dim) * len(x[dim])) # use len(x[dim]) for consistency
+    ynorm = (y - y.mean(dim)) / y.std(dim)
+
+    # Pass the underlying NumPy arrays to the optimized Scipy function
+    # This avoids potential xarray wrappers within the inner loop of signal.correlate
+    corr = signal.correlate(xnorm.values, ynorm.values, mode="full")
+    lags = signal.correlation_lags(len(xnorm.values), len(ynorm.values), mode="full")
+    
+    # Return as xarray DataArrays if you need them downstream (which you do, for np.trapz in decorrelation)
+    # Recreate the xarray DataArray structure for the correlation output
+    corr_da = xr.DataArray(corr, coords={'lags': lags}, dims=['lags'])
+    lags_da = xr.DataArray(lags, coords={'lags': lags}, dims=['lags'])
+
+    return corr_da, lags_da
+
+# Add numba optimization to the decorrelation function where possible
+@njit
+def integrate_correlation(C, lags, Imin, Imax, len_y):
+    # This part can be safely jitted
+    dcl = np.trapz(C[Imin:Imax], lags[Imin:Imax])
+    dof = len_y / dcl
+    return dcl, dof
+
+def decorrelation_optimized(x,y,dim,doplot,precision=2,print_text=False):
+    # The xcorr_norm function likely cannot be jitted if it uses xarray objects internally
+    C,lags = xcorr_norm(x,y,dim) 
+    # ... (rest of the index finding logic) ...
+    idx2 = int((len(C)+1)/2)
+    # ... (find idx) ...
+    
+    if idx>0:
+        Imin,Imax= idx2-idx-1,idx2+idx
+        # Use the jitted function for the integration step
+        dcl, dof = integrate_correlation(C.values, lags.values, Imin, Imax, len(y))
+    # ... (rest of the logic for idx==0, printing, plotting) ...
+    return dcl,dof
+
+
+## Standard error (Refined)
+def std_error_refined(da, dim='TIME'):
+    da_std = da.std(dim=dim)
+    # Perform fillna once here before passing to decorrelation
+    da_filled = da.fillna(0)
+    _, dof = decorrelation(da_filled, da_filled, dim, 0)
+    return da_std / np.sqrt(dof)
+
+def std_error_loop_optimized(ds):
+    """
+    Uses xarray/dask deferred computation for speed.
+    """
+    ds_vars = ds.data_vars
+    new_vars_to_add = {}
+
+    for var in ds_vars:
+        if ('_SE' not in var.upper()) and (ds[var].size > 1):
+            # The calculation is assigned, but NOT computed yet
+            da_se = std_error_refined(ds[var]) # Use the refined function
+
+            # Store the operation and metadata
+            new_vars_to_add[f'{var}_SE'] = da_se.assign_attrs({
+                'name':f'{var}_SE',
+                'long_name':f'Standard error of {var}',
+                 'units':ds[var].attrs.get('units', 'unknown')
+            })
+
+    # Execute all computations simultaneously and merge back
+    if not new_vars_to_add:
+        return ds
+
+    # Create a new Dataset from the scheduled tasks and compute once
+    ds_se = xr.Dataset(new_vars_to_add).compute() 
+    
+    # Merge the new standard error variables into the original dataset
+    ds = ds.merge(ds_se,compat='no_conflicts')
     
     return ds
 

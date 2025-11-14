@@ -92,13 +92,13 @@ def print_rt_parameters_gsw(ds_RT: xr.Dataset):
 
     # --- Print Parameter Suggestions ---
     print("\n--- Parameter Suggestions ---")
-    print("Please set the following parameters in the /scr/RT_parameter.py:")
+    print("Please set the following parameters in the /scr/RT_parameters.py:")
     
     # Use f-string formatting for rounding as requested
-    print(f"SA_ref={max_SA:.2f}     # Reference Absolute Salinity (g/kg) defined as max")
-    print(f"CT_ref={min_CT:.2f}      # Reference Conservative Temperature (C) defined as min")
-    print(f"Cp={max_CP:.0f}          # Constant:Specific heat capacity (J kg^-1 C^-1) defined as max")
-    print(f"rho0={mean_rho0:.1f}      # Reference density kg m^-3 defined as mean")
+    print(f"SA_ref={ds_RT['SG_WEST'].mean().values:.2f}     # Reference Absolute Salinity (g/kg) defined as mean at WB1")
+    print(f"CT_ref={ds_RT['TG_WEST'].mean().values:.2f}      # Reference Conservative Temperature (C) defined as mean at WB1")
+    print(f"Cp={max_CP:.0f}          # Constant:Specific heat capacity (J kg^-1 C^-1) defined as max all")
+    print(f"rho0={mean_rho0:.1f}      # Reference density kg m^-3 defined as mean all")
 
 # Get dx
 def get_dx(lon,lat,dim='lon'):

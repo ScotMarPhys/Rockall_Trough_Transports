@@ -293,10 +293,10 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked,cruise_label=True):
 
     ax = axs[0,0]
     da = ds_RT.TG_EAST
-    imT = (da-da.mean('TIME')).plot(ax=ax,x='TIME',yincrease=False,
+    imT = (da-da.mean('TIME')).plot(ax=ax,x='TIME',y='depth',yincrease=False,
                        levels=tem_levs,cmap=cm.cm.balance,
                        add_colorbar=False)
-    p=sigma.plot.contour(ax=ax,x='TIME',
+    p=sigma.plot.contour(ax=ax,x='TIME',y='depth',
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
@@ -304,10 +304,10 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked,cruise_label=True):
 
     ax = axs[1,0]
     da= ds_RT.SG_EAST
-    imS= (da-da.mean('TIME')).plot(ax=ax,x='TIME',yincrease=False,
+    imS= (da-da.mean('TIME')).plot(ax=ax,x='TIME',y='depth',yincrease=False,
                         levels=sal_levs, cmap=cm.cm.balance,
                         add_colorbar=False)
-    p=sigma.plot.contour(ax=ax,x='TIME',
+    p=sigma.plot.contour(ax=ax,x='TIME',y='depth',
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
@@ -321,10 +321,10 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked,cruise_label=True):
 
     ax = axs[0,1]
     da = ds_RT.TG_WEST
-    (da-da.mean('TIME')).plot(ax=ax,x='TIME',yincrease=False,
+    (da-da.mean('TIME')).plot(ax=ax,x='TIME',y='depth',yincrease=False,
                        levels=tem_levs,cmap=cm.cm.balance,
                        add_colorbar=False)
-    p=sigma.plot.contour(ax=ax,x='TIME',
+    p=sigma.plot.contour(ax=ax,x='TIME',y='depth',
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
@@ -332,10 +332,10 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked,cruise_label=True):
 
     ax = axs[1,1]
     da = ds_RT.SG_WEST
-    (da-da.mean('TIME')).plot(ax=ax,x='TIME',yincrease=False,
+    (da-da.mean('TIME')).plot(ax=ax,x='TIME',y='depth',yincrease=False,
                        levels=sal_levs,cmap=cm.cm.balance,
                        add_colorbar=False)
-    p=sigma.plot.contour(ax=ax,x='TIME',
+    p=sigma.plot.contour(ax=ax,x='TIME',y='depth',
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
@@ -344,12 +344,14 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked,cruise_label=True):
 
     for ax in axs[0:,1]:
         ax.set_ylabel('')
+    for ax in axs[0:,0]:
+        ax.set_ylabel('Depth (m)')
     for ax in axs.flat:
         ax.tick_params(axis='x', labelrotation=45)
 
     for i, label in enumerate(('(a)', '(b)','(c)','(d)')):
         ax =  axs.flat[i]
-        ax.text(-.05, 1., label, transform=ax.transAxes,
+        ax.text(.0, 1.05, label, transform=ax.transAxes,
           fontsize=fs, ha='left',va='bottom')
         ax.vlines(ds_cruises.TIME,0, 1,transform=ax.get_xaxis_transform(),color='k',linestyle='--')
         ax.grid()
@@ -376,13 +378,13 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked,cruise_label=True):
     # cb =fig.colorbar(imV, cax=cbar_ax)
     # cb.set_label('Meridional velocity Anomaly [m/s]')
 
-    cbar_ax = fig.add_axes([0.92, 0.51, 0.02, 0.38])
+    cbar_ax = fig.add_axes([0.92, 0.56, 0.02, 0.35])
     cb =fig.colorbar(imT, cax=cbar_ax)
-    cb.set_label('Conservative temperature\n anomaly [°C]')
+    cb.set_label('Conservative temperature\n anomaly (°C)')
 
-    cbar_ax = fig.add_axes([0.92, 0.06, 0.02, 0.38])
+    cbar_ax = fig.add_axes([0.92, 0.12, 0.02, 0.35])
     cb =fig.colorbar(imS, cax=cbar_ax)
-    cb.set_label('Absolute salinity\n anomaly [g/kg]')
+    cb.set_label('Absolute salinity\n anomaly (g kg$^{-1}$)')
 
     return fig,axs
 

@@ -45,8 +45,8 @@ ladcp_selected.stdvct = ladcp_data_in.stdvct(z_idx, indsel);
 ladcp_selected.SEu = ladcp_data_in.SEu(z_idx, indsel);
 ladcp_selected.SEv = ladcp_data_in.SEv(z_idx, indsel);
 ladcp_selected.SEvct = ladcp_data_in.SEvct(z_idx, indsel);
-ladcp_selected.PTMP = ladcp_data_in.PTMP(z_idx, indsel,years_idx);
-ladcp_selected.SAL = ladcp_data_in.SAL(z_idx, indsel,years_idx);
+ladcp_selected.CT = ladcp_data_in.CT(z_idx, indsel,years_idx);
+ladcp_selected.SA = ladcp_data_in.SA(z_idx, indsel,years_idx);
 ladcp_selected.u = ladcp_data_in.u(z_idx, indsel,years_idx);
 ladcp_selected.v = ladcp_data_in.v(z_idx, indsel,years_idx);
 

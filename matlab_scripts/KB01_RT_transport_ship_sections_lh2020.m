@@ -29,7 +29,7 @@ figname = 'ladcp_mean_Rockall_Trough';
 %% Parameter preamble 
 
 % load RT parameters
-RT_parameters
+rtp = loadParametersStruct('RT_parameters.m');
 
 % Figures parameters
 font_type = 'Calibri';
@@ -119,12 +119,12 @@ end
 
 %% create grid
 
-lon_WW = linspace(RT_loc.RTWS.lon,RT_loc.RTWB.lon,NX_WW);
-lat_WW = linspace(RT_loc.RTWS.lat,RT_loc.RTWB.lat,NX_WW);
-lon_MB = linspace(RT_loc.RTWB.lon,RT_loc.RTEB1.lon,NX_MB);
-lat_MB = linspace(RT_loc.RTWB.lat,RT_loc.RTEB1.lat,NX_MB);
-lon_EW = linspace(RT_loc.RTEB1.lon,RT_loc.RTES.lon,NX_MB);
-lat_EW = linspace(RT_loc.RTEB1.lat,RT_loc.RTES.lat,NX_MB);
+lon_WW = linspace(RT_loc.RTWS.lon,RT_loc.RTWB.lon,rtp.NX_WW);
+lat_WW = linspace(RT_loc.RTWS.lat,RT_loc.RTWB.lat,rtp.NX_WW);
+lon_MB = linspace(RT_loc.RTWB.lon,RT_loc.RTEB1.lon,rtp.NX_MB);
+lat_MB = linspace(RT_loc.RTWB.lat,RT_loc.RTEB1.lat,rtp.NX_MB);
+lon_EW = linspace(RT_loc.RTEB1.lon,RT_loc.RTES.lon,rtp.NX_MB);
+lat_EW = linspace(RT_loc.RTEB1.lat,RT_loc.RTES.lat,rtp.NX_MB);
 
 %% bathymetry
 % Check and transpose elevation if necessary so Z(lat, lon) or Z(rows, columns)
@@ -385,7 +385,7 @@ year_idx = [1,7,8,13:17];
 ladcp_MB = select_ladcp_lon_range(ladcp_gridded, ...
     lon_w, lon_e,z_lim,year_idx);
     
-figure(7)
+figure(7),cla
 for i=1:length(year_idx);
     subplot(3,3,i)
     contourf(ladcp_MB.lon(:),ladcp_MB.depth(:),squeeze(ladcp_MB.v(:,:,i)))
@@ -393,28 +393,71 @@ for i=1:length(year_idx);
     axis ij
 end
 
+ladcp_MB
+
 %%
-dz = diff(ladcp_MB.depth);
-dz = ([0,dz]+[dz,0])/2;
+CT_pro = (ladcp_MB.CT(:,1,:)+ladcp_MB.CT(:,end,:))/2;
+SA_pro = (ladcp_MB.SA(:,1,:)+ladcp_MB.SA(:,end,:))/2;
+T_MB = calculateTransports(ladcp_MB, CT_pro, SA_pro, rtp)
 
-dx = diff(ladcp_MB.cumdist);
-dx = ([0,dx']+[dx',0])/2;
+filename = 'stats_midbasin.tex';
+region = 'Mid-Basin (MB)';
 
+generateStatsTable(T_MB, filename, region);
 
+figure(10)
+subplot(3,1,1),cla
+plot(T_MB.Q)
+subplot(3,1,2),cla
+plot(T_MB.Qh)
+hold on
+plot(T_MB.Qh_pro)
+legend('full','mean profile WB1/2, EB1')
+subplot(3,1,3),cla
+plot(T_MB.Qf)
+hold on
+plot(T_MB.Qf_pro)
+legend('full','mean profile WB1/2, EB1')
 
+%%
+% Start with western wedge transports
+lon_w = RT_loc.RTWS.lon;
+lon_e = RT_loc.RTWB.lon;
+z_lim = 1760;
+year_idx = [1,4,7,8,11,13:17];
 
-% % Transport in each cell
-% q_WW = RT_hor_grid.dx_WW*ds_RT.dz*(v_WW)
-% 
-% % calculations
-% qh = rtp.rhoCp*q*(CT - rtp.CT_ref);
-% qf = -1*q*(SA - rtp.SA_ref)/rtp.SA_ref;
-% qS = q*SA/rtp.rho0;
-% 
-% mask = q.notnull()
-% qCT = (CT*q.notnull()).where(mask);
-% qSA = (SA*q.notnull()).where(mask);
-% 
-% Qh = qh.sum(dims)/1e15;
-% Qf = qf.sum(dims)/1e6;
-% QS = qS.sum(dims)/1e3;
+ladcp_WW = select_ladcp_lon_range(ladcp_gridded, ...
+    lon_w, lon_e,z_lim,year_idx);
+    
+figure(8),cla
+for i=1:length(year_idx);
+    subplot(3,4,i)
+    contourf(ladcp_WW.lon(:),ladcp_WW.depth(:),squeeze(ladcp_WW.v(:,:,i)))
+    xline([lon_w lon_e], ':', 'Color', [0.5 0.5 0.5], 'LineWidth', 1);
+    axis ij
+end
+
+ladcp_WW
+
+CT_pro = ladcp_WW.CT(:,end,:);
+SA_pro = ladcp_WW.SA(:,end,:);
+T_WW = calculateTransports(ladcp_WW, CT_pro, SA_pro, rtp)
+
+filename = 'stats_ww.tex';
+region = 'Western Wedge';
+
+generateStatsTable(T_WW, filename, region);
+
+figure(11),cla
+hold on
+subplot(3,1,1),cla
+plot(T_WW.Q)
+subplot(3,1,2),cla
+plot(T_WW.Qh)
+hold on
+plot(T_WW.Qh_pro)
+legend('full WW','mean profile WB1/2')
+subplot(3,1,3),cla
+plot(T_WW.Qf)
+plot(T_WW.Qf_pro)
+legend('full WW','mean profile WB1/2')

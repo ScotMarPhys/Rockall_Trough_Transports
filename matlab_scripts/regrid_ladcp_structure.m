@@ -4,6 +4,10 @@ function ladcp_gridded = regrid_ladcp_structure(ladcp)
     %
     % ladcp_gridded = regrid_ladcp_structure(ladcp)
 
+    disp('First calculating CT and SA...');
+    [ladcp.SA, ladcp.CT] = calculateSACT(ladcp.PTMP,ladcp.SAL, ladcp.depth, ...
+        ladcp.lon, ladcp.lat);
+
     disp('Starting regridding process...');
 
     % --- 1. Define the original and target grids ---
@@ -32,7 +36,7 @@ function ladcp_gridded = regrid_ladcp_structure(ladcp)
     % --- 2. Regrid 3D variables (depth x original_point x year) ---
     % Variables: PTMP, SAL, u, v
 
-    variables_3d = {'PTMP', 'SAL', 'u', 'v'};
+    variables_3d = {'u', 'v','CT','SA'};
     num_years = size(ladcp.v, 3); 
 
     for var_name = variables_3d

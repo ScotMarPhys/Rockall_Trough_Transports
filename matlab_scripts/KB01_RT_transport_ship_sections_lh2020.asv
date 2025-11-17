@@ -229,9 +229,9 @@ area( lon_finer,bathy_hr,-3000,'Facecolor',[0.5 0.5 0.5])
 
 % For text annotations, use the specific 'Fontsize' and 'Fontname' properties 
 % to ensure consistency, as text objects do not always fully inherit from the axes parent.
-xline(ladcp.lon, '--','color',[.5 .5 .5],  'LineWidth', 0.8); 
-% text(ladcp.lon,repmat(-2000,length(ladcp.cast_name),1),ladcp.cast_name,...
-%     'Fontsize',fs,'Fontname',font_type,'HorizontalAlignment','center')
+xline(ladcp.lon, 'k:',  'LineWidth', 0.5); 
+text(ladcp.lon,repmat(-2000,length(ladcp.cast_name),1),ladcp.cast_name,...
+    'Fontsize',fs,'Fontname',font_type,'HorizontalAlignment','center')
 
 % horizontal lines
 plot([RT_loc.RTWB.lon RT_loc.RTEB1.lon],[-1760 -1760], ':k', ...

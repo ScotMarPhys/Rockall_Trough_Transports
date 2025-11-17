@@ -830,3 +830,104 @@ def std_error_loop_optimized(ds):
     return ds
 
 
+def generate_stats_table(ds, ds_pro, filename_tex, region_str):
+    """
+    Calculates statistics, prints to console, and saves a LaTeX table.
+
+    Inputs:
+        ds           : Xarray Dataset containing 'Qf' (full calc) and 'Qh' (full calc)
+        ds_pro       : Xarray Dataset containing 'Qf' (profile calc) and 'Qh' (profile calc)
+        filename_tex : String specifying the output .tex filename (e.g., 'stats_MB.tex')
+        region_str   : String label for the region (e.g., 'Mid-Basin (MB)')
+    """
+
+    # Extract the relevant integrated transport DataArrays from the Datasets
+    # Use .values to work with underlying numpy arrays or keep as DataArrays for alignment
+    Qf = ds['Qf']
+    Qf_pro = ds_pro['Qf']
+    Qh = ds['Qh']
+    Qh_pro = ds_pro['Qh']
+
+    # Ensure alignment (xarray automatically aligns on coordinates, but this is good practice)
+    Qf, Qf_pro = xr.align(Qf, Qf_pro)
+    Qh, Qh_pro = xr.align(Qh, Qh_pro)
+
+    # Calculate differences (for MBE and RMSE)
+    Qf_diff = Qf - Qf_pro
+    Qh_diff = Qh - Qh_pro
+
+    # Define the scaling factor (10e-2 = 0.01)
+    scale_factor = 1e-2
+    
+    # Define a helper function for scaling and calculating stats
+    def calculate_scaled_stats(data_full, data_pro, data_diff, scale):
+        stats = {}
+        # Use skipna=True (equivalent to 'omitnan' in MATLAB)
+        stats['mean_full'] = data_full.mean(skipna=True).item() / scale
+        stats['mean_pro']  = data_pro.mean(skipna=True).item() / scale
+        stats['std_full']  = data_full.std(skipna=True).item() / scale
+        stats['std_pro']   = data_pro.std(skipna=True).item() / scale
+        stats['mbe']       = data_diff.mean(skipna=True).item() / scale
+        # RMSE manual calculation using numpy functions on the underlying data
+        stats['rmse']      = np.sqrt(((data_full - data_pro)**2).mean(skipna=True).item()) / scale
+        return stats
+
+    # Calculate all stats in one go
+    stats_Qf = calculate_scaled_stats(Qf, Qf_pro, Qf_diff, scale_factor)
+    stats_Qh = calculate_scaled_stats(Qh, Qh_pro, Qh_diff, scale_factor)
+
+
+    ### 2. Print stats to Python console (using f-strings for formatting)
+
+    print(f"\nStatistics Summary for Region: {region_str}")
+    print("####################################################")
+    # Using format specifiers in f-strings: {var: >width.precisionf}
+    print(f"{'Metric':<20} {'Qf (10e-2 Sv)':>15} {'Qh (10e-2 PW)':>15}")
+    print("####################################################")
+
+    print(f"{'Mean full':<20} {stats_Qf['mean_full']:>15.4f} {stats_Qh['mean_full']:>15.4f}")
+    print(f"{'Mean profile':<20} {stats_Qf['mean_pro']:>15.4f} {stats_Qh['mean_pro']:>15.4f}")
+    print(f"{'Mean Bias':<20} {stats_Qf['mbe']:>15.4f} {stats_Qh['mbe']:>15.4f}")
+    print("----------------------------------------------------")
+    print(f"{'Std Dev full':<20} {stats_Qf['std_full']:>15.4f} {stats_Qh['std_full']:>15.4f}")
+    print(f"{'Std Dev profile':<20} {stats_Qf['std_pro']:>15.4f} {stats_Qh['std_pro']:>15.4f}")
+    print(f"{'RMSE':<20} {stats_Qf['rmse']:>15.4f} {stats_Qh['rmse']:>15.4f}")
+    print("####################################################\n")
+
+
+    ### 3. Print as LaTeX table to the specified file
+
+    # Python uses 'with open(...) as f:' context manager which safely handles file closing
+    try:
+        with open(filename_tex, 'w') as f: 
+            # Write LaTeX table preamble
+            f.write('\\begin{table}[h!]\n')
+            f.write('\\centering\n')
+            f.write(f'\\caption{{Summary of Qf and Qh Statistics for {region_str} (Units are in $10^{{-2}}$ Sv and $10^{{-2}}$ PW)}}\n')
+            f.write(f'\\label{{tab:stats_summary_{region_str.replace(" ", "_").replace("-", "")}}}\n')
+            f.write('\\begin{tabular}{|l|c|c|}\n')
+            f.write('\\hline\n')
+
+            # Write LaTeX table header row
+            f.write('Metric & Qf (10e-2 Sv) & Qh (10e-2 PW) \\\\\n')
+            f.write('\\hline\n')
+            f.write('\\hline\n')
+
+            # Write data rows (%.4f format specifiers)
+            f.write(f"Mean full & {stats_Qf['mean_full']:.4f} & {stats_Qh['mean_full']:.4f} \\\\\n")
+            f.write(f"Mean profile & {stats_Qf['mean_pro']:.4f} & {stats_Qh['mean_pro']:.4f} \\\\\n")
+            f.write(f"Mean Bias & {stats_Qf['mbe']:.4f} & {stats_Qh['mbe']:.4f} \\\\\n")
+            f.write('\\hline\n')
+            f.write(f"Std Dev full & {stats_Qf['std_full']:.4f} & {stats_Qh['std_full']:.4f} \\\\\n")
+            f.write(f"Std Dev profile & {stats_Qf['std_pro']:.4f} & {stats_Qh['std_pro']:.4f} \\\\\n")
+            f.write(f"RMSE & {stats_Qf['rmse']:.4f} & {stats_Qh['rmse']:.4f} \\\\\n")
+            f.write('\\hline\n')
+
+            # Write LaTeX table postamble
+            f.write('\\end{tabular}\n')
+            f.write('\\end{table}\n')
+        
+        print(f"Successfully saved LaTeX table to: {filename_tex}")
+
+    except IOError as e:
+        print(f"Error writing to file {filename_tex}: {e}")

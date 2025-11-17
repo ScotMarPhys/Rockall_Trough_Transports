@@ -547,12 +547,18 @@ def resample_to_glider_data(v_RTEB1,ds_glider,win_days = 1,t_dim='TIME',v='v'):
     # Aerage regular mooring dataset onto the irregular time steps of glider dataset
     # using a window of ±1 day
     v_RTEB1=v_RTEB1.rename({t_dim:'time'})
-    
+
     # 2. Define the averaging window (±win_days day)
     window_size = pd.Timedelta(days=win_days)
     
     # 3. Create an empty list to hold the averaged results
     averaged_values = []
+
+    if v=='3D':
+        original_dims = v_RTEB1.dims
+        # Identify the non-time dimensions
+        non_time_dims = [dim for dim in original_dims if dim != 'time']
+        expected_non_time_order = tuple(non_time_dims)
     
     # 4. Loop through each irregular time step
     for t_irreg in ds_glider.time.values:
@@ -568,6 +574,8 @@ def resample_to_glider_data(v_RTEB1,ds_glider,win_days = 1,t_dim='TIME',v='v'):
         if data_in_window.size > 0:
             # Average the data in the window
             average_value = data_in_window.mean(dim='time')
+            if v=='3D':
+                average_value = average_value.transpose('lon', 'depth')
             averaged_values.append(average_value.values)
         else:
             # Append NaN if no data is found for a given time window
@@ -589,11 +597,73 @@ def resample_to_glider_data(v_RTEB1,ds_glider,win_days = 1,t_dim='TIME',v='v'):
                    'mode': v_RTEB1.mode},
             dims=['time','mode']
         )
+    elif v=='3D':   
+        # display(averaged_values)
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            # coords={'time': ds_glider.time,
+            #        'depth': v_RTEB1.depth*-1,
+            #        'lon': v_RTEB1.lon.values},
+            # dims=['time','lon','depth']
+        )
     else:
         v_RTEB1_resampled = xr.DataArray(
             averaged_values,
             coords={'time': ds_glider.time},
             dims=['time']
         )
+        
+    return v_RTEB1_resampled
+
+
+###################
+def resample_to_glider_data_3d(v_RTEB1, ds_glider, win_days=1, t_dim='TIME'):
+    # Rename time dimension for consistency
+    v_RTEB1 = v_RTEB1.rename({t_dim: 'time'})
+    
+    # 2. Define the averaging window (±win_days day)
+    window_size = pd.Timedelta(days=win_days)
+    
+    # 3. Create an empty list to hold the averaged results (as xarray objects)
+    averaged_arrays = []
+    
+    # 4. Loop through each irregular time step
+    for t_irreg in ds_glider.time.values:
+        start_time = t_irreg - window_size
+        end_time = t_irreg + window_size
+    
+        data_in_window = v_RTEB1.sel(time=slice(start_time, end_time))
+        
+        if data_in_window.size > 0:
+            average_value = data_in_window.mean(dim='time')
+            # Append the xarray DataArray object itself, not .values
+            averaged_arrays.append(average_value) 
+        else:
+            # For empty windows, create a placeholder DataArray with NaNs 
+            # and the correct structure/dimensions to ensure consistency.
+            # We use the structure of the last good average or a template.
+            # A simple way for a template:
+            if averaged_arrays:
+                nan_placeholder = averaged_arrays[-1].copy(data=np.nan * averaged_arrays[-1].shape)
+                averaged_arrays.append(nan_placeholder)
+            else:
+                # If first iteration is empty, this needs a fallback. 
+                # For simplicity here, we assume the first window is usually not empty. 
+                # A more complex solution might require defining a template array first.
+                pass 
+                
+    # 5. Concatenate the list of xarray DataArrays along a new 'time' dimension
+    # This automatically handles consistent ordering of existing dimensions (depth, lon, mode)
+    if averaged_arrays:
+        v_RTEB1_resampled = xr.concat(averaged_arrays, dim='time')
+        # Assign the correct time coordinates from the glider data
+        v_RTEB1_resampled = v_RTEB1_resampled.assign_coords({"time": ds_glider.time})
+    else:
+        # Handle case where averaged_arrays is empty
+        return None 
+
+    # 6. Apply final coordinate remapping if necessary (moved outside of the loop/concat logic)
+    if 'depth' in v_RTEB1_resampled.coords:
+        v_RTEB1_resampled = v_RTEB1_resampled.assign_coords({"depth": v_RTEB1_resampled.depth * -1})
         
     return v_RTEB1_resampled

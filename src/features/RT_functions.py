@@ -9,6 +9,7 @@ import pandas as pd
 import scipy.signal as signal
 import palettable.colorbrewer as cb
 import xarray as xr
+import pymannkendall as mk
 from pathlib import Path
 from matplotlib import pyplot as plt
 from scipy.signal import butter, filtfilt
@@ -931,3 +932,194 @@ def generate_stats_table(ds, ds_pro, filename_tex, region_str):
 
     except IOError as e:
         print(f"Error writing to file {filename_tex}: {e}")
+
+## Updated trends ###############################################
+def calculate_dt_days(dataset_time_coord):
+    """
+    Safely calculates the time step duration in days from an xarray time coordinate.
+    """
+    if len(dataset_time_coord) < 2:
+        raise ValueError("Time coordinate must have at least 2 steps.")
+
+    # Get the precise difference as a pandas Timedelta
+    dt_timedelta = pd.to_timedelta(np.diff(dataset_time_coord.values)[0])
+    
+    # Convert the timedelta to a numeric value representing total days
+    dt_days = dt_timedelta.total_seconds() / (60 * 60 * 24)
+    
+    return dt_days
+
+def calculate_and_format_trends(dataset):
+    """
+    Calculates Hamed and Rao modified MK trends for variables in an xarray dataset,
+    excluding QS variables.
+    Formats the results into structured pandas DataFrames with separate columns for
+    Trend and P-value, and saves them as a specific LaTeX table format.
+
+    Args:
+        dataset (xr.Dataset): The input xarray dataset containing variables like Q_MB, Q_lp_MB etc.
+    """
+    results_list = []
+
+    # Scale trend to 10 years:
+    # Assuming 'TIME' or 'time' exists and is correct in the dataset
+    time_coord_name = 'time' if 'time' in dataset.coords else 'TIME'
+
+    dt_days = calculate_dt_days(dataset[time_coord_name])
+    scale_factor_10yr = (10 * 365.25) / dt_days
+    
+    print(f"Detected time step duration (dt): {dt_days} days")
+    print(f"10-year scaling factor: {scale_factor_10yr:.2f} time steps per 10 years")
+    print("-" * 50)
+
+    # Iterate through variables and perform the test
+    for var_name in dataset.data_vars:
+        # Skip variables that start with QS
+        if var_name.startswith('QS'):
+            continue
+
+        data = dataset[var_name]
+        
+        if data.size > 1:
+            try:
+                series_data = data.to_pandas()
+                result = mk.hamed_rao_modification_test(series_data)
+                
+                # Scale the slope to a 10-year trend value
+                scaled_slope = result.slope * scale_factor_10yr
+                
+                results_list.append({
+                    'Variable': var_name,
+                    'Trend_Value': scaled_slope, # Renamed to avoid confusion with formatted string
+                    'P_value_Numeric': result.p # Renamed to store numeric value for comparison
+                })
+
+            except Exception as e:
+                print(f"Could not calculate trend for {var_name}: {e}")
+                results_list.append({
+                    'Variable': var_name,
+                    'Trend_Value': np.nan,
+                    'P_value_Numeric': np.nan
+                })
+
+    # Convert results list to a DataFrame
+    results_df = pd.DataFrame(results_list)
+    
+    # Filter out variables ending in _total or _total_lp for the main tables
+    filtered_df = results_df[~results_df['Variable'].str.contains('_total|_tot_')]
+
+    # Split into 'lp' (low pass) and 'main' dataframes
+    df_lp = filtered_df[filtered_df['Variable'].str.contains('_lp')]
+    df_main = filtered_df[~filtered_df['Variable'].str.contains('_lp')]
+
+    def create_latex_table(df, filename_stem):
+        # Extract the site (MB, EW, WW) and the variable name (Q, Qh, Qf)
+        df['Site'] = df['Variable'].str.rsplit('_', n=1).str[-1]
+        # .str[0] is needed to select the first element after the split
+        df['VarName'] = df['Variable'].str.replace('_lp', '').str.rsplit('_', n=1).str[0]
+        
+        # Initialize new columns for the *formatted strings* for the table body
+        df['Formatted_Trend'] = np.nan
+        df['Formatted_Pvalue'] = np.nan
+        
+        # Apply specific formatting based on variable name and bold for significance
+        
+        def format_and_bold(row, is_p_value=False):
+            value_numeric = row['P_value_Numeric'] if is_p_value else row['Trend_Value']
+            var_name = row['VarName']
+            
+            if pd.isna(value_numeric):
+                return '-'
+
+            # Q formatting
+            if var_name == 'Q':
+                fmt_str = "{:3.2f}"
+            # Qh and Qf formatting
+            else: 
+                if is_p_value:
+                    fmt_str = "{:4.3f}"
+                else:
+                    value_numeric *= 1e2 # Apply 1e2 scale for display
+                    fmt_str = "{:3.2f}"
+            
+            val_formatted = fmt_str.format(value_numeric)
+
+            # Apply bolding based on P_value_Numeric column
+            if row['P_value_Numeric'] <= 0.05:
+                return f"\\textbf{{{val_formatted}}}"
+            else:
+                return val_formatted
+
+        df['Formatted_Trend'] = df.apply(lambda row: format_and_bold(row, is_p_value=False), axis=1)
+        df['Formatted_Pvalue'] = df.apply(lambda row: format_and_bold(row, is_p_value=True), axis=1)
+
+        # Create pivoted tables using the NEW formatted string columns
+        trends_table_str = df.pivot(index='VarName', columns='Site', values='Formatted_Trend')
+        p_values_table_str = df.pivot(index='VarName', columns='Site', values='Formatted_Pvalue')
+
+        # Combine into a MultiIndex column DataFrame, ensuring WW, MB, EW order
+        site_order = ['WW', 'MB', 'EW']
+        
+        # Create empty combined table with desired structure
+        final_table = pd.DataFrame(index=trends_table_str.index, columns=pd.MultiIndex.from_product([site_order, ['Trend', 'P-value']]))
+
+        # Fill the combined table with data
+        for site in site_order:
+            if site in trends_table_str.columns:
+                final_table[(site, 'Trend')] = trends_table_str[site]
+                final_table[(site, 'P-value')] = p_values_table_str[site]
+
+        # Reorder rows to the specified order (Q, Qh, Qf)
+        var_order = ['Q', 'Qh', 'Qf']
+        final_table = final_table.reindex(index=var_order)
+        
+        # Rename row index with units (using LaTeX math environment for units)
+        final_table = final_table.rename(index={'Q': '$Q$ (Sv)', 
+                                                'Qh': '$Q_h$ (10$^{-2}$ PW)', 
+                                                'Qf': '$Q_f$ (10$^{-2}$ Sv)'})
+
+        # --- Generate the specific LaTeX string manually to match the desired format ---
+        latex_filename = f'{filename_stem}.tex'
+        
+        latex_string = "\\begin{table}\n"
+        latex_string += "\t\\caption{10 year trends and p-value for volume ($ Q $), heat ($ Q_{h} $) and freshwater ($ Q_{f} $) transport after \\citep{Hamed1998}.}\n"
+        latex_string += "\t\\begin{tabular}{|l|cc|cc|cc|}\n"
+        latex_string += "\t\t\\hline\n"
+        latex_string += "\t\t& \\multicolumn{2}{c|}{\\textbf{Western wedge}} & \\multicolumn{2}{c|}{\\textbf{Mid basin}} & \\multicolumn{2}{c|}{\\textbf{Eastern wedge}} \\\\\n"
+        latex_string += "\t\t& Trend & P-value & Trend & P-value & Trend & P-value \\\\\n"
+        latex_string += "\t\t\\hline\n"
+        
+        # Add the data rows
+        for index, row in final_table.iterrows():
+            # Use final_table structure which has MultiIndex columns
+            row_str = f"\t\t{index} & {row[('WW', 'Trend')]} & {row[('WW', 'P-value')]} & {row[('MB', 'Trend')]} & {row[('MB', 'P-value')]} & {row[('EW', 'Trend')]} & {row[('EW', 'P-value')]} \\\\\n"
+            # Ensure NaNs are handled correctly (pandas default is 'nan' string if conversion fails earlier)
+            row_str = row_str.replace('nan', '-')
+            latex_string += row_str
+            
+        latex_string += "\t\t\\hline\n"
+        latex_string += "\t\\end{tabular}\n"
+        latex_string += "\\end{table}"
+
+        # Save the manually generated LaTeX string to a file
+        with open(latex_filename, 'w') as f:
+            f.write(latex_string)
+
+        print(f"\nSuccessfully saved LaTeX table to {latex_filename}")
+        
+        return final_table
+
+    # Generate and print the tables
+    print("\n" + "="*50)
+    print("Main Variables Trend Table (Excluding QS, Formatted for LaTeX)")
+    print("="*50)
+    main_table = create_latex_table(df_main.copy(), 'Q_trend_all')
+    display(main_table)
+    
+    print("\n" + "="*50)
+    print("Low Pass Variables Trend Table (Excluding QS, Formatted for LaTeX)")
+    print("="*50)
+    lp_table = create_latex_table(df_lp.copy(), 'Q_lp_all')
+    display(lp_table)
+    
+    return main_table, lp_table

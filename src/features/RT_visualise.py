@@ -453,7 +453,7 @@ def plot_RT_mean_sections_from_mooring(ds_q_RT,ds_RT_loc):
     return fig
 ##########################################################################################
 
-def plot_EOF(model_EOF,v_mean,ds_RT_loc,dim,TIME_dim='TIME'):
+def plot_EOF(model_EOF,v_mean,ds_RT_loc,ds_q_RT,dim,TIME_dim='TIME'):
     
     fs = 14
     font = {'weight' : 'normal',
@@ -474,7 +474,7 @@ def plot_EOF(model_EOF,v_mean,ds_RT_loc,dim,TIME_dim='TIME'):
     vmin,vmax,levs=-0.2,0.2,21
     im_hdl_1 = v_mean.plot(x=dim,ax=ax,yincrease=False,add_colorbar=False,
                 vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
-    ax.set_ylabel('Depth [m]', fontsize=fs)   
+    ax.set_ylabel('Depth (m)', fontsize=fs)   
 
 
     for i,ax in enumerate(axs[1:]):
@@ -498,6 +498,9 @@ def plot_EOF(model_EOF,v_mean,ds_RT_loc,dim,TIME_dim='TIME'):
         ax.set_xlim([ds_RT_loc.lon_RTEB-0.01,ds_RT_loc.lon_RTES+0.01])
         axis_lat_lon_formatter(ax,form='xlon')
         ax.tick_params(axis='x', labelrotation=25)
+        
+        ax.fill_between(ds_q_RT.lon, -ds_q_RT.bathy,2000,color='grey')
+        ax.fill_between([-9.2,-9.1], [194.7,194.7],2000,color='grey')
 
         ax.vlines(ds_RT_loc.lon_RTADCP,700,50,color='k',ls=':',lw=3)
         ax.plot(ds_RT_loc.lon_RTADCP,50, marker='s', 
@@ -506,7 +509,7 @@ def plot_EOF(model_EOF,v_mean,ds_RT_loc,dim,TIME_dim='TIME'):
                 markersize=10, 
                 mew=2.5)
         
-        ax.vlines(ds_RT_loc.lon_RTEB,1000,50,color='k',ls=':',lw=3)
+        ax.vlines(ds_RT_loc.lon_RTEB,1760,50,color='k',ls=':',lw=3)
         ax.plot(ds_RT_loc.lon_RTEB,50,marker='o', 
                 markerfacecolor='lime', 
                 markeredgecolor='k',     # White border
@@ -519,6 +522,7 @@ def plot_EOF(model_EOF,v_mean,ds_RT_loc,dim,TIME_dim='TIME'):
                 markeredgecolor='k',     # White border
                 markersize=12,
                 mew=2)
+        ax.set_ylim([2000,0])
     
     for i, label in enumerate(('(a)','(b)','(c)','(d)')):
         ax =  axs.flat[i]

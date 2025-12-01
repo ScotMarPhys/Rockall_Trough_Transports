@@ -198,7 +198,7 @@ def plot_moorings_paper(ds_RT,ds_RT_stacked,cruise_label=True):
                         levels=sig_lev,colors='grey',
                         yincrease=False,linewidths=1)
     # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
-    pres = gsw.z_from_p(ds_RT_stacked.PS_WEST_1_UV, 57.1)
+    pres = -1*gsw.z_from_p(ds_RT_stacked.PS_WEST_1_UV, 57.1)
     pres.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_1_UV',add_legend=False,lw=0.5)
     pres = -1*gsw.z_from_p(ds_RT_stacked.PS_WEST_2_UV, 57.1)
     pres.plot.line('k',ax=ax,x='TIME',hue='ZS_WEST_2_UV',add_legend=False,lw=0.5)

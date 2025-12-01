@@ -590,6 +590,13 @@ def resample_to_glider_data(v_RTEB1,ds_glider,win_days = 1,t_dim='TIME',v='v'):
                    'PRES': v_RTEB1.PRES},
             dims=['time','depth']
         )
+    if v=='hydro':
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            coords={'TIME': ds_glider.time.values,
+                   'depth': v_RTEB1.depth},
+            dims=['TIME','depth']
+        )
     elif v=='m':
         v_RTEB1_resampled = xr.DataArray(
             averaged_values,

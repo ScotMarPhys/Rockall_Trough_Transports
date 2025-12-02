@@ -152,6 +152,14 @@ def load_glider_nc():
     ds_glider = ds_glider.rename({'x2':'x','t':'time','z':'depth','v':'vcur'})
     ds_glider = ds_glider.set_coords(['lon','lat']).swap_dims({'x':'lon'})
 
+    ### Some section do not reach 1000m, will exclude them here
+    all_lons_are_nan_mask = ds_glider.vcur.isnull().all(dim='lon')
+    all_lons_are_nan_mask = all_lons_are_nan_mask.sum('depth')!=0
+    dummy = all_lons_are_nan_mask.sum('time')
+    if dummy>0:
+        print(f'Found {dummy.values} glider sections which do not reach to 1000 m and excluded them')
+        ds_glider = ds_glider.isel(time=~all_lons_are_nan_mask)
+    
     return ds_glider
 
 def load_eap():

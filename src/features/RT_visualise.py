@@ -643,3 +643,49 @@ def plot_EOF_HEOF(model_EOF,model_HEOF,ds_RT_loc,dim,TIME_dim='TIME'):
     cb =fig.colorbar(im_pha, cax=cbar_ax)
     cb.ax.set_ylabel('phase')
     return fig
+
+#########################
+def quick_plot_spectrum(spectrum_test):
+    import matplotlib.transforms as mtransforms
+    vl_val_days = np.array([16,30,60,90,365,])
+    vl_labels = ['16 days', '30 days', '60 days', '90 days', '1 year']
+    ymin,ymax = 0,0.2
+    text_pad_points = 3 
+    
+    fig,axs=plt.subplots(1,1)
+    
+    ax=axs
+    spectrum_test.sel(frequency_cpd = slice(None,0.1)).plot(ax=ax)
+    
+    ax.vlines(
+        x=1/vl_val_days,    # The X-coordinates of the lines
+        ymin=ymin,       # The bottom of all the lines
+        ymax=ymax,       # The top of all the lines
+        colors='red',        # Color of the lines
+        linestyles='--',     # Style of the lines (e.g., dashed)
+        lw=0.8,       # Label for the legend 
+            )
+    for x_pos, label_txt in zip(vl_val_days, vl_labels):
+        offset_transform = mtransforms.offset_copy(
+            ax.transData, 
+            fig=fig, 
+            x=text_pad_points, # Offset in X direction by 5 points
+            y=0, 
+            units='points'
+        )
+        ax.text(
+            x=1/(x_pos), 
+            y=ymax * 0.95,           # Place text near the top of the line (95% of ymax)
+            s=label_txt,             # The text string
+            rotation='vertical',     # Make the text vertical
+            horizontalalignment='left', # Align the right edge of the text with x_pos
+            verticalalignment='top',
+            color='red',
+            fontsize=10,
+            transform=offset_transform
+        )
+    
+    ax.set_ylim([ymin,ymax])
+    ax.set_xlabel('Frequency [cycles per day]')
+    ax.set_ylabel('Power Spectral\nDensity')
+    ax.grid(True)

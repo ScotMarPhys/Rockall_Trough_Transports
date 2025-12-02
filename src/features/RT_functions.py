@@ -1123,3 +1123,56 @@ def calculate_and_format_trends(dataset):
     display(lp_table)
     
     return main_table, lp_table
+
+    ################################
+
+def calculate_lombscargle_spectrum(q_moored: xr.DataArray, dim: str = 'TIME') -> xr.DataArray:
+    """
+    Calculates the Lomb-Scargle Periodogram for cycles between 5 years and the 
+    Nyquist frequency of the data, with results in Cycles Per Day (cpd).
+    """
+    
+    if dim not in q_moored.dims:
+        raise ValueError(f"Dimension '{dim}' not found in the input DataArray.")
+
+    # 1. Extract the time values (relative days from start time) and data values
+    time_numeric = (q_moored[dim].values - q_moored[dim].values[0]) / np.timedelta64(1, 'D')
+    data_values = q_moored.values
+
+    # Handle potential NaNs in your data by filtering them out for Lomb-Scargle
+    valid_indices = ~np.isnan(data_values)
+    t = time_numeric[valid_indices]
+    x = data_values[valid_indices]
+    
+    # Check if we have enough data points to proceed
+    if len(t) < 10:
+        raise ValueError("Not enough valid data points to perform spectral analysis.")
+
+    # 2. Define the frequencies to scan (in Cycles Per Day (cpd))
+
+    # Dynamically calculate the average sampling interval (dt_avg) in DAYS
+    dt_avg_days = np.mean(np.diff(t))
+    
+    # Nyquist frequency is 1 / (2 * dt_avg_days)
+    # The highest frequency you can reliably measure is half the average sampling rate
+    max_freq = 1.0 / (2.0 * dt_avg_days)
+    
+    # Minimum frequency is based on your requirement (5 years = ~1826 days)
+    min_freq = 1.0 / (5 * 365.25) 
+    
+    num_freqs = 2000 # Increased resolution for wide range
+
+    # Ensure min_freq is not higher than max_freq
+    freqs = np.linspace(min_freq, max_freq, num_freqs) 
+
+    # 3. Calculate the Lomb-Scargle Periodogram
+    power = signal.lombscargle(t, x, freqs, normalize=True) 
+
+    # 4. Convert the results back into an Xarray DataArray
+    spectrum_da = xr.DataArray(
+        power,
+        coords={"frequency_cpd": freqs},
+        dims=["frequency_cpd"]
+    )
+    
+    return spectrum_da

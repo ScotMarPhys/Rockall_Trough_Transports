@@ -22,6 +22,7 @@ from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
 from matplotlib import pyplot as plt
 import matplotlib.ticker as ticker
+import matplotlib.transforms as mtransforms
 
 def create_formatter(direction, ax):
     """
@@ -646,7 +647,6 @@ def plot_EOF_HEOF(model_EOF,model_HEOF,ds_RT_loc,dim,TIME_dim='TIME'):
 
 #########################
 def quick_plot_spectrum(spectrum_test):
-    import matplotlib.transforms as mtransforms
     vl_val_days = np.array([16,30,60,90,365,])
     vl_labels = ['16 days', '30 days', '60 days', '90 days', '1 year']
     ymin,ymax = 0,0.2
@@ -689,3 +689,103 @@ def quick_plot_spectrum(spectrum_test):
     ax.set_xlabel('Frequency [cycles per day]')
     ax.set_ylabel('Power Spectral\nDensity')
     ax.grid(True)
+
+################
+
+def plot_spectra_by_region_vertical(spectra_ds: xr.Dataset, var_base: str,fs=14):
+    """
+    Plots the Lomb-Scargle spectra for Total, EW, MB, and WW regions 
+    in a 4x1 vertical subplot grid for a specific variable base (Q, Qh, or Qf).
+    """
+    font = {'weight' : 'normal',
+        'size'   : fs}
+    plt.rc('font', **font)
+
+    # colors for regions
+    c_EW = 'C1'
+    c_MB = 'C2'
+    c_WW = 'C0'
+    c_total = 'k'
+    
+    # Configuration for vertical lines
+    vl_val_days = np.array([16, 30, 60, 90, 365.25])
+    vl_labels = ['16 days', '30 days', '60 days', '90 days', '1 year']
+    x_positions_cpd = 1 / vl_val_days
+    ymin, ymax = 0, 0.2  # Adjust Y-limits as needed for your data range
+    xmin,xmax= None,0.08
+    text_pad_points = 3 
+
+    regions = ['_total', '_EW', '_MB', '_WW']
+    region_titles = ['(a) Total', '(b) Eastern wedge',
+                     '(c) Mid basin', '(d) Western wedge']
+    c_region = [c_total,c_EW,c_MB,c_WW]
+
+    # Create a 4x1 vertical subplot grid, sharing the X and Y axes
+    fig, axs = plt.subplots(4, 1, figsize=(10, 12), sharex=True, sharey=True)
+
+    for i, region in enumerate(regions):
+        ax = axs[i]
+        var_name = f"{var_base}{region}_spectrum"
+        
+        if var_name in spectra_ds.data_vars:
+            # 1. Plot the actual spectrum data
+            spectra_ds[var_name].sel(frequency_cpd=slice(None, 0.1)).plot.line(
+                ax=ax, color=c_region[i], linewidth=1.5)
+            # Add the title to the specific axis
+            ax.set_title(f"{region_titles[i]} ({var_base})", loc='left',
+                         fontsize=fs)
+        else:
+            ax.set_title(f"{region_titles[i]} (Data Missing)", loc='left')
+            print(f"Warning: {var_name} not found in input dataset.")
+
+        # 2. Add Vertical Lines and Labels
+        ax.vlines(
+            x=x_positions_cpd,
+            ymin=ymin,
+            ymax=ymax,
+            colors='red',
+            linestyles='--',
+            lw=0.8,
+        )
+        
+        for x_pos in x_positions_cpd:
+            offset_transform = mtransforms.offset_copy(
+                ax.transData, 
+                fig=fig, 
+                x=text_pad_points, 
+                y=0, 
+                units='points'
+            )
+            
+            # Find the corresponding label for the current x_pos (frequency)
+            label_index = np.where(np.isclose(x_positions_cpd, x_pos))[0][0]
+            label_txt = vl_labels[label_index]
+
+            ax.text(
+                x=x_pos, 
+                y=ymax * 0.95,
+                s=label_txt,
+                rotation='vertical',
+                horizontalalignment='left',
+                verticalalignment='top',
+                color='red',
+                fontsize=fs-2,
+                transform=offset_transform
+            )
+        
+        # 3. Final Axis Configuration
+        ax.set_ylim([ymin, ymax])
+        ax.set_xlim([xmin,xmax])
+        ax.set_ylabel('Power Spectral\nDensity')
+        ax.grid(True)
+        
+        # Remove X-axis label for all but the bottom-most plot
+        if i < len(regions) - 1:
+            ax.set_xlabel('')
+        else:
+            ax.set_xlabel('Frequency (cycles per day)')
+
+
+    plt.tight_layout()
+    # Add a main super title if needed
+    plt.show()

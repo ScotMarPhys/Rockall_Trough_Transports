@@ -328,25 +328,31 @@ def plot_error_paper(da_Q_obs,da_Q_rec,mode,axs,fig,var_str='Q',title_str='EW',t
         unit_str = r'$\degree$C'
     elif var_str=='SA':
         unit_str = 'g/kg'
-    
+
+    c_line = ['k','r','b']
+    symbols = ['x','1','+']
+    ms=10
     
     if mode==0:
         Q_rec = da_Q_rec
         result = scipy.stats.linregress(Q_rec,da_Q_obs)
         RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
-        axs.plot(Q_rec,da_Q_obs,'.',
-             label=f'{title_str}R={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE {result.stderr:3.2f},\np={result.pvalue:.3f}')
+        axs.plot(Q_rec,da_Q_obs,symbols[mode],color=c_line[mode],
+                         markersize=ms,
+             label=f'{title_str}R={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE {result.stderr:3.2f} {unit_str},\np={result.pvalue:.3f}')
     else:
         for i in range(mode):
             Q_rec = da_Q_rec.isel(mode=i)
             result = scipy.stats.linregress(Q_rec,da_Q_obs)
             RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
             if i==0:
-                axs.plot(da_Q_obs,Q_rec,'.',
-                         label=f'{title_str}{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f}, \np={result.pvalue:.3f} ')
+                axs.plot(da_Q_obs,Q_rec,symbols[i],color=c_line[i],
+                         markersize=ms,
+                         label=f'{title_str}{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} {unit_str}, \np={result.pvalue:.3f} ')
             else:
-                axs.plot(da_Q_obs,Q_rec,'.',
-                     label=f'{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f}, \np={result.pvalue:.3f} ')
+                axs.plot(da_Q_obs,Q_rec,symbols[i],color=c_line[i],
+                         markersize=ms,
+                     label=f'{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} {unit_str}, \np={result.pvalue:.3f} ')
     
     axs.plot(np.arange(-50,50),np.arange(-50,50),color='k',lw=0.8,ls='--')
     if var_str=='Q':
@@ -409,7 +415,7 @@ def plot_error_paper(da_Q_obs,da_Q_rec,mode,axs,fig,var_str='Q',title_str='EW',t
     # axs.legend(bbox_to_anchor=(horizontal_anchor, vertical_anchor), 
     #            loc=final_loc)
 
-    axs.legend(bbox_to_anchor=(0, -.2), loc='upper left')
+    axs.legend(markerscale=2.,bbox_to_anchor=(0, -.2), loc='upper left')
     axs.set_aspect('equal', adjustable='box')
     axs.grid()
     axs.axvline(0,color='k',lw=0.8,ls='--')

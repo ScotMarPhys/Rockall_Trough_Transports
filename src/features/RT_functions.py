@@ -1176,3 +1176,59 @@ def calculate_lombscargle_spectrum(q_moored: xr.DataArray, dim: str = 'TIME') ->
     )
     
     return spectrum_da
+
+######################
+
+def process_all_spectra(ds_input: xr.Dataset, dim: str = 'TIME') -> xr.Dataset:
+    """
+    Calculates the Lomb-Scargle spectrum for specific Q/Qh/Qf variables 
+    across different regions in the input Dataset.
+
+    Parameters
+    ----------
+    ds_input : xr.Dataset
+        The input dataset (e.g., RT_Q_Qh_Qf)
+    dim : str, optional
+        The name of the time dimension, by default 'TIME'.
+
+    Returns
+    -------
+    xr.Dataset
+        A new Dataset containing the frequency spectra for all valid variables.
+    """
+    
+    base_vars = ['Q', 'Qh', 'Qf']
+    regions = ['_MB', '_WW', '_EW', '_total']
+    
+    # Generate all potential variable names we are looking for
+    target_vars = [base + region for base in base_vars for region in regions]
+
+    # Dictionary to store the results
+    spectra_results = {}
+    
+    print(f"Starting spectral analysis for {len(target_vars)} potential variables...")
+
+    for var_name in target_vars:
+        if var_name in ds_input.data_vars:
+            print(f"  Processing variable: {var_name}")
+            # Select the single DataArray and run the calculation
+            ts_dataarray = ds_input[var_name].reset_coords()
+            ts_dataarray = ts_dataarray[var_name]
+            # Use the helper function to get the spectrum
+            try:
+                spectrum_da = calculate_lombscargle_spectrum(ts_dataarray, dim='TIME')
+                spectra_results[var_name + '_spectrum'] = spectrum_da
+            except ValueError as e:
+                print(f"  Skipping {var_name} due to error: {e}")
+        else:
+            print(f"  Variable {var_name} not found in input dataset. Skipping.")
+
+    if not spectra_results:
+        print("No spectra were successfully calculated.")
+        return None
+
+    # Combine all individual spectrum DataArrays into a single new Dataset
+    output_dataset = xr.Dataset(spectra_results)
+    
+    print(f"\nSuccessfully generated spectra for {len(output_dataset.data_vars)} variables.")
+    return output_dataset

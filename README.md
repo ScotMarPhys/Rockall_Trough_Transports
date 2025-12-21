@@ -41,10 +41,15 @@ Note: To obtain Ekman transport estimate you first will have to obatin monthly m
 ### Glider spacial pattern analysis
 To perform an analysis of the dominant spatial pattern in the Glider sections use notebooks/2.0_Rockall_Trough_glider_EW_EOF_2020_2025.ipynb or 2.1_Rockall_Trough_glider_EW_HEOF_2020_2025.ipynb. As the new methodology automatically performs an EOF analysis of the glider sections, it is not nessecary to run these if you are only interested in the transports.
 
-
 The other notebooks are used to produce nice figures for paper and presentations and may include additional data products and analysis. They are dependent on data output of lower order notebooks.
 
-The following notebooks and matlab scripts produce most figures in Burmeister, K., Fraser, N. J., Jones, S. C., Cunningham, S. A., Drysdale, L. A., Inall, M. E., Dotto, T. S., and Holliday, N. P.: Eight years of continuous Rockall Trough transport observations using moorings and gliders, EGUsphere [preprint], https://doi.org/10.5194/egusphere-2025-3167, 2025:
+## Publications
+Burmeister, K., Fraser, N. J., Jones, S. C., Cunningham, S. A., Drysdale, L. A., Inall, M. E., Dotto, T. S., and Holliday, N. P.: Eight years of continuous Rockall Trough transport observations using moorings and gliders, EGUsphere [preprint], https://doi.org/10.5194/egusphere-2025-3167, 2025
+The following notebooks and matlab scripts produce most figures in Burmeister et al. (preprint):
 - notebooks/2.0_Rockall_Trough_glider_EW_EOF_2020_2025.ipynb
 - notebooks/9.0_Paper_Rokcall_Trough_Results.ipynb
 - matlab_scripts/KB01_RT_transport_ship_sections_lh2020.m
+
+Fraser, N. J., Cunningham, S. A., Drysdale, L. A., Inall, M. E., Johnson, C., Jones, S. C., Burmeister, K., Fox, A. D., Dumont, E., Porter, M., and Holliday, N. P.: North Atlantic Current and European Slope Current Circulation in the Rockall Trough Observed Using Moorings and Gliders, Journal of Geophysical Research: Oceans, 127, https://doi.org/10.1029/2022JC019291, 2022.
+
+Houpert, L., Cunningham, S., Fraser, N., Johnson, C., Holliday, N. P., Jones, S., Moat, B., and Rayner, D.: Observed Variability of the North Atlantic Current in the Rockall Trough From 4 Years of Mooring Measurements, Journal of Geophysical Research: Oceans, 125, 1–9, https://doi.org/10.1029/2020JC016403, 2020.

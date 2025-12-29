@@ -17,7 +17,9 @@ def load_glider_mat(glider_data_path,glider_fn):
 
     ds_glider = xr.Dataset(
         data_vars=dict(
-            vcur=(['x','depth','time'],df_glider['v_grid'])),
+            vcur=(['x','depth','time'],df_glider['v_grid']),
+            CT=(['xT','depth','time'],df_glider['CT_grid']),
+            SA=(['xT','depth','time'],df_glider['SA_grid'])),
         coords=dict(
             time=glider_tgrid,
             x=df_glider['x2_grid'],

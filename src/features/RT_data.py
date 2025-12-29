@@ -13,6 +13,30 @@ import sys; sys.path.append(r'../../')
 import src.set_paths as sps
 import src.features.matfile_functions as matlab_fct
 
+# get mooring data from Thredds server automatically
+def load_RT_moor(file_name_in_grid):
+    if (sps.RT_mooring_data_path/file_name_in_grid).is_file():
+        ds_RT = xr.open_dataset((sps.RT_mooring_data_path/file_name_in_grid))
+        print(f"Load existing data set.")
+    else:
+        
+        opendap_url = f"https://thredds.sams.ac.uk/thredds/dodsC/osnapstuff/{file_name_in_grid}"
+        
+        try:
+            # Open the OPeNDAP dataset directly with xarray
+            ds_RT = xr.open_dataset(opendap_url)
+        
+            # # Save the full dataset to a local NetCDF file
+            ds_RT.to_netcdf(sps.RT_mooring_data_path/file_name_in_grid)
+        
+            print(f"Dataset downloaded and saved to {sps.RT_mooring_data_path/file_name_in_grid}")
+        
+        except Exception as e:
+            print(f"Error accessing or saving dataset from {opendap_url}: {e}")
+    return ds_RT
+
+
+
 def load_glorys(moor,tmin,tmax,dx=.5,dy=.5,zmin=0,zmax=1000):
     GLORYS_data_path = (sps.raw_data_dir/'data_GLORYS')
     GLORYS_data_path.mkdir(parents=True, exist_ok=True)
@@ -46,7 +70,7 @@ def load_glorys(moor,tmin,tmax,dx=.5,dy=.5,zmin=0,zmax=1000):
               minimum_latitude=np.floor(lat-dy),
               maximum_latitude=np.ceil(lat+dy),
               start_datetime=f'{tmin_str}T00:00:00',
-              end_datetime=f'{tmin_str}T00:00:00',
+              end_datetime=f'{tmax_str}T00:00:00',
               minimum_depth=zmin,
               maximum_depth=zmax,
               output_filename = GLORYS_fn,
@@ -120,6 +144,24 @@ def load_glorys(moor,tmin,tmax,dx=.5,dy=.5,zmin=0,zmax=1000):
                                        (GLORYS_data_path/GLORYS_fn_an)])
     return ds_GLORYS
 
+def load_glider_nc():
+    ds_glider = xr.open_dataset((sps.glider_data_path_nc/sps.glider_nc_fn),decode_times=False)
+    ds_glider['t'] = matlab_fct.mt2dt(ds_glider.t)
+
+    ds_glider = ds_glider.interp(x=ds_glider.x2).drop_vars('x')
+    ds_glider = ds_glider.rename({'x2':'x','t':'time','z':'depth','v':'vcur'})
+    ds_glider = ds_glider.set_coords(['lon','lat']).swap_dims({'x':'lon'})
+
+    ### Some section do not reach 1000m, will exclude them here
+    all_lons_are_nan_mask = ds_glider.vcur.isnull().all(dim='lon')
+    all_lons_are_nan_mask = all_lons_are_nan_mask.sum('depth')!=0
+    dummy = all_lons_are_nan_mask.sum('time')
+    if dummy>0:
+        print(f'Found {dummy.values} glider sections which do not reach to 1000 m and excluded them')
+        ds_glider = ds_glider.isel(time=~all_lons_are_nan_mask)
+    
+    return ds_glider
+
 def load_eap():
     ds_EAP = xr.open_dataset((sps.EAP_path/sps.EAP_fn),decode_times=False)
     datesin = cftime.num2date(ds_EAP.T, ds_EAP.T.units, '360_day')
@@ -134,7 +176,7 @@ def load_nao():
 
     ds_NAO = xr.Dataset(
         data_vars=dict(
-            NAO_index=(['time'],df_NAO['index'])),
+            NAO_index=(['time'],df_NAO['nao_index_cdas'])),
         coords=dict(
             time=date),
         attrs=dict(

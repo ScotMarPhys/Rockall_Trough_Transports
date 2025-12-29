@@ -27,6 +27,79 @@ import src.features.matfile_functions as matlab_fct
 import src.features.RT_EOF_functions as rt_eof
 
 
+def print_rt_parameters_gsw(ds_RT: xr.Dataset):
+    """
+    Calculates and prints derived parameters from the ds_RT dataset 
+    using the gsw library, accounting for PRES as a coordinate.
+
+    Assumes ds_RT contains SG_EAST, TG_EAST, SG_WEST, TG_WEST data variables 
+    and PRES as a coordinate.
+
+    Args:
+        ds_RT: An xarray Dataset containing required variables and coordinates.
+    """
+    
+    required_vars = ['SG_EAST', 'TG_EAST', 'SG_WEST', 'TG_WEST']
+    required_coords = ['PRES']
+    
+    if not all(v in ds_RT.data_vars for v in required_vars):
+        print(f"Error: Input dataset is missing one or more required data variables: {required_vars}")
+        return
+    if not all(c in ds_RT.coords for c in required_coords):
+        print(f"Error: Input dataset is missing required coordinate: {required_coords}")
+        return
+
+    # --- Calculate GSW properties for East and West sides ---
+    # xarray will handle broadcasting ds_RT.PRES for calculations
+    
+    # East Side Calculations
+    t_east = gsw.t_from_CT(ds_RT['SG_EAST'], ds_RT['TG_EAST'], ds_RT.PRES)
+    cp_east = gsw.cp_t_exact(ds_RT['SG_EAST'], t_east, ds_RT.PRES)
+    sigma_east = gsw.sigma0(ds_RT['SG_EAST'], ds_RT['TG_EAST']) # Sigma0 uses 0 dbar reference pressure
+
+    # West Side Calculations
+    t_west = gsw.t_from_CT(ds_RT['SG_WEST'], ds_RT['TG_WEST'], ds_RT.PRES)
+    cp_west = gsw.cp_t_exact(ds_RT['SG_WEST'], t_west, ds_RT.PRES)
+    sigma_west = gsw.sigma0(ds_RT['SG_WEST'], ds_RT['TG_WEST'])
+
+    # Combine data for overall stats calculation across both regions
+    all_TG = xr.concat([ds_RT['TG_EAST'], ds_RT['TG_WEST']], dim='combined_data')
+    all_SA = xr.concat([ds_RT['SG_EAST'], ds_RT['SG_WEST']], dim='combined_data')
+    all_CP = xr.concat([cp_east, cp_west], dim='combined_data')
+    all_Sigma = xr.concat([sigma_east, sigma_west], dim='combined_data')
+
+
+    # --- Calculate intermediate summary values (Max/Min/Mean for suggestions) ---
+    max_CP = all_CP.max().values
+    max_SA = all_SA.max().values
+    min_CT = all_TG.min().values # Renamed CT in output for clarity (Conservative Temperature)
+    mean_rho0 = all_Sigma.mean().values + 1000 # Add 1000 back to anomaly for rho0
+    
+    # --- Print statistics (Max, Min, Mean) ---
+    print("\n--- EAST - Data Statistics (Max, Min, Mean) ---")
+    print(f"CT        | Max: {ds_RT['TG_EAST'].max().values:6.3f} | Min: {ds_RT['TG_EAST'].min().values:6.3f} | Mean: {ds_RT['TG_EAST'].mean().values:.3f}")
+    print(f"SA        | Max: {ds_RT['SG_EAST'].max().values:6.3f} | Min: {ds_RT['SG_EAST'].min().values:6.3f} | Mean: {ds_RT['SG_EAST'].mean().values:.3f}")
+    print(f"CP        | Max: {cp_east.max().values:6.1f} | Min: {cp_east.min().values:6.1f} | Mean: {cp_east.mean().values:.1f}")
+    print(f"Sigma0    | Max: {sigma_east.max().values:6.3f} | Min: {sigma_east.min().values:6.3f} | Mean: {sigma_east.mean().values:.3f}")
+
+ # --- Print statistics (Max, Min, Mean) ---
+    print("\n--- WEST - Data Statistics (Max, Min, Mean) ---")
+    print(f"CT        | Max: {ds_RT['TG_WEST'].max().values:6.3f} | Min: {ds_RT['TG_WEST'].min().values:6.3f} | Mean: {ds_RT['TG_WEST'].mean().values:.3f}")
+    print(f"SA        | Max: {ds_RT['SG_WEST'].max().values:6.3f} | Min: {ds_RT['SG_WEST'].min().values:6.3f} | Mean: {ds_RT['SG_WEST'].mean().values:.3f}")
+    print(f"CP        | Max: {cp_west.max().values:6.1f} | Min: {cp_west.min().values:6.1f} | Mean: {cp_west.mean().values:.1f}")
+    print(f"Sigma0    | Max: {sigma_west.max().values:6.3f} | Min: {sigma_west.min().values:6.3f} | Mean: {sigma_west.mean().values:.3f}")
+
+
+    # --- Print Parameter Suggestions ---
+    print("\n--- Parameter Suggestions ---")
+    print("Please set the following parameters in the /scr/RT_parameters.py:")
+    
+    # Use f-string formatting for rounding as requested
+    print(f"SA_ref={ds_RT['SG_WEST'].mean().values:.2f}     # Reference Absolute Salinity (g/kg) defined as mean at WB1")
+    print(f"CT_ref={ds_RT['TG_WEST'].mean().values:.2f}      # Reference Conservative Temperature (C) defined as mean at WB1")
+    print(f"Cp={max_CP:.0f}          # Constant:Specific heat capacity (J kg^-1 C^-1) defined as max all")
+    print(f"rho0={mean_rho0:.1f}      # Reference density kg m^-3 defined as mean all")
+
 # Get dx
 def get_dx(lon,lat,dim='lon'):
     
@@ -61,14 +134,14 @@ def create_horizontal_grid(version):
     ds_RT_loc=rtd.load_RT_loc()
     
     # create lat and lon grid
-    lon_WW = xr.DataArray(np.linspace(ds_RT_loc.lon_RTWS,ds_RT_loc.lon_RTWB,rtp.NX_WW),dims='lon_WW')
-    lat_WW = xr.DataArray(np.linspace(ds_RT_loc.lat_RTWS,ds_RT_loc.lat_RTWB,rtp.NX_WW),dims='lon_WW')
-    lon_MB = xr.DataArray(np.linspace(ds_RT_loc.lon_RTWB,ds_RT_loc.lon_RTEB,rtp.NX_MB),dims='lon_MB')
-    lat_MB = xr.DataArray(np.linspace(ds_RT_loc.lat_RTWB,ds_RT_loc.lat_RTEB,rtp.NX_MB),dims='lon_MB')
+    lon_WW = xr.DataArray(np.linspace(ds_RT_loc.lon_RTWS.values,ds_RT_loc.lon_RTWB.values,rtp.NX_WW),dims='lon_WW')
+    lat_WW = xr.DataArray(np.linspace(ds_RT_loc.lat_RTWS.values,ds_RT_loc.lat_RTWB.values,rtp.NX_WW),dims='lon_WW')
+    lon_MB = xr.DataArray(np.linspace(ds_RT_loc.lon_RTWB.values,ds_RT_loc.lon_RTEB.values,rtp.NX_MB),dims='lon_MB')
+    lat_MB = xr.DataArray(np.linspace(ds_RT_loc.lat_RTWB.values,ds_RT_loc.lat_RTEB.values,rtp.NX_MB),dims='lon_MB')
     
     if version=='v0':
-        lon_EW = xr.DataArray(np.linspace(ds_RT_loc.lon_RTEB,ds_RT_loc.lon_RTES,rtp.NX_EW),dims='lon_EW')
-        lat_EW = xr.DataArray(np.linspace(ds_RT_loc.lat_RTEB,ds_RT_loc.lat_RTES,rtp.NX_EW),dims='lon_EW')
+        lon_EW = xr.DataArray(np.linspace(ds_RT_loc.lon_RTEB.values,ds_RT_loc.lon_RTES.values,rtp.NX_EW),dims='lon_EW')
+        lat_EW = xr.DataArray(np.linspace(ds_RT_loc.lat_RTEB.values,ds_RT_loc.lat_RTES.values,rtp.NX_EW),dims='lon_EW')
     elif version=='v1':
         ds_glider = matlab_fct.load_glider_mat(sps.glider_data_path,sps.glider_fn)
         lon_EW = xr.DataArray(ds_glider.lon.values,dims='lon_EW')
@@ -102,7 +175,8 @@ def create_horizontal_grid(version):
                             dx_EW.rename('dx_EW'),
                             lat_WW.rename('lat_WW'),
                             lat_MB.rename('lat_MB'),
-                            lat_EW.rename('lat_EW')])
+                            lat_EW.rename('lat_EW')],
+                          compat='no_conflicts')
     RT_hor_grid.coords['lon_WW']=lon_WW.values
     RT_hor_grid.coords['lon_MB_1']=lon_MB.values
     RT_hor_grid.coords['lon_EW']=lon_EW.values
@@ -212,7 +286,8 @@ def calc_MB_transport(ds_RT,ds_RT_loc,sens_analysis=True,check_plots=True):
                         Q_MB_CTfix.rename(Q_MB_CTfix.attrs['name']),
                         Q_MB_SAfix_CTfix.rename(Q_MB_SAfix_CTfix.attrs['name']),
                         Q_MB_WB_CTvar.rename(Q_MB_WB_CTvar.attrs['name']),
-                        Q_MB_EB_CTvar.rename(Q_MB_EB_CTvar.attrs['name'])]
+                        Q_MB_EB_CTvar.rename(Q_MB_EB_CTvar.attrs['name'])],
+                           compat='no_conflicts'
                           ).drop_vars(['lat_MB','lon_MB'])
     else:
         RT_Q_MB = Q_MB.drop_vars(['lat_MB','lon_MB'])
@@ -308,8 +383,8 @@ def calc_MB_3D_sections(ds_RT,ds_RT_loc,RT_hor_grid):
     ds_RT_MB_grid = xr.merge([q_MB_grid.rename('q'),
                               v.rename('v'),
                           TG_MB_grid.rename('CT').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB),
-                          SG_MB_grid.rename('SA').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB)]
-                            )
+                          SG_MB_grid.rename('SA').drop('lat_MB').interp(lon_MB=q_MB_grid.lon_MB)],
+                            compat='no_conflicts')
     ds_RT_MB_grid.coords['mask'] = q_MB_grid.notnull()
     ds_RT_MB_grid = ds_RT_MB_grid.rename({'lat_MB':'lat','lon_MB':'lon','dx_MB':'dx'})
     
@@ -541,9 +616,9 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
     ds_glider = ds_glider.interp(depth=('depth',ds_RT.depth.data)).rename({'time':'TIME'})
     
     # Calculate glider EOF
-    v_anomaly = ds_glider.vcur.resample(TIME="15D").mean()
+    v_anomaly = ds_glider.vcur
     v_anomaly = v_anomaly - v_anomaly.mean('TIME',keep_attrs=True)
-    glider_EOF = rt_eof.EOF_func(v_anomaly,n_modes=1,plot_out=False,dim='lon',TIME_dim='TIME')
+    glider_EOF = rt_eof.EOF_func(v_anomaly,n_modes=2,plot_out=False,dim='lon',TIME_dim='TIME')
     
     # Get RTEB1 meridional velocity
     v_RTEB1=(ds_RT.V_EAST/1e2)
@@ -557,7 +632,7 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
                         lon=[ds_RT_loc.lon_RTADCP],method='nearest').data,
                         latitude=ds_RT_loc.lat_RTADCP,
                         time=('time',v_RTEB1.TIME.data),
-                        depth=('depth',v_RTEB1.depth.data)) + rtp.corr_model
+                        depth=('depth',v_RTEB1.depth.data))
 
     # Duplicate top GLORYS-ADCP values
     mask = v_GLO_RTADCP
@@ -568,10 +643,11 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
 
     # combinde both to one matrix (time,depth,lon)
     ds_y = xr.concat([v_RTEB1,v_GLO_RTADCP], dim="lon")
+    ds_y = ds_y.sel(depth=ds_glider.depth)
     ds_y['lon']=glider_locs.lon.data
 
     # Remove glider sections temporal mean from y
-    ds_y = (ds_y-glider_locs).compute()
+    ds_y = (ds_y-ds_y.mean('TIME')).compute()
 
     # get EOF components at mooring positions as X for linear regression (X'X*alpha=X'y)
     # initial X matrix (mode,lon,depth)
@@ -580,6 +656,7 @@ def calc_EW_transport(ds_RT,ds_RT_loc,RT_hor_grid,ds_glider,ds_GEBCO,ds_GLORYS,c
 
     # get alpha & reconstruct velocity fields
     v_rec = rt_eof.rec_v_sec(ds_X,ds_y,glider_EOF,ds_glider.vcur,TIME_dim='TIME')
+    v_rec = v_rec.sel(mode=2)
 
     zlim = v_rec.depth.where(v_rec.notnull()).max()
     (v_EW,_) = xr.broadcast(v_RTEB1,v_rec.lon)
@@ -742,7 +819,8 @@ def calc_Ekman_transport(ds_ERA5, RT_hor_grid,ds_RT_loc,check_plots=True):
     # Merge to dataset
     RT_Q_Ek = xr.merge([Q_Ek_WW.rename(Q_Ek_WW.attrs['name']),
                     Q_Ek_MB.rename(Q_Ek_MB.attrs['name']),
-                    Q_Ek_EW.rename(Q_Ek_EW.attrs['name'])])
+                    Q_Ek_EW.rename(Q_Ek_EW.attrs['name'])],
+                       compat="no_conflicts")
     
     if check_plots:
         (RT_Q_Ek.Q_Ek_WW+RT_Q_Ek.Q_Ek_MB+RT_Q_Ek.Q_Ek_EW).plot(lw=.5,color='k',label='tot',figsize=[6,4])
@@ -800,7 +878,10 @@ def calc_transports(Q,q,CT,SA,dims,sec_str):
     Q.attrs['name']= f'Q'
     Q.attrs['long_name']= f'Volume Transport'
     Q.attrs['units']=Q.units
-    Q.attrs['description']=Q.description
+    if hasattr(Q, 'description'):
+        Q.attrs['description']=Q.description
+    else:
+        Q.attrs['description']=f'Volume transport for Rockall Trough {sec_str}'
     
     Qh.attrs['name']= f'Qh'
     Qh.attrs['long_name']= f'Heat transport'
@@ -823,11 +904,13 @@ def calc_transports(Q,q,CT,SA,dims,sec_str):
     ds_Q = xr.merge([Q.rename(Q.attrs['name']),
                      Qh.rename(Qh.attrs['name']),
                      Qf.rename(Qf.attrs['name']),
-                     QS.rename(QS.attrs['name'])])
+                     QS.rename(QS.attrs['name'])],
+                   compat='no_conflicts')
     ds_q = xr.merge([q.rename(q.attrs['name']),
                      qh.rename(qh.attrs['name']),
                      qf.rename(qf.attrs['name']),
-                     qS.rename(qS.attrs['name'])])
+                     qS.rename(qS.attrs['name'])],
+                   compat='no_conflicts')
     
     if 'mask' in str(Q.coords):
         ds_Q.coords[f'mask_{sec_str[:2]}'] = Q[f'mask_{sec_str[:2]}']

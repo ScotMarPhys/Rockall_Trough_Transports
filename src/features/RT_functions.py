@@ -9,12 +9,14 @@ import pandas as pd
 import scipy.signal as signal
 import palettable.colorbrewer as cb
 import xarray as xr
+import pymannkendall as mk
 from pathlib import Path
 from matplotlib import pyplot as plt
 from scipy.signal import butter, filtfilt
 from xhistogram.xarray import histogram as xhist
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
+from numba import njit
 
 ##local functions
 import sys; sys.path.append(r'../')
@@ -22,6 +24,20 @@ import src.RT_parameters as rtp
 import src.set_paths as sps
 import src.features.RT_data as rtd
 import src.features.matfile_functions as matlab_fct
+
+# which times are duplicated
+def check_for_duplicates(ds,dim,remove=True):
+    print(ds[dim].to_index().duplicated().any())
+    
+    if ds[dim].to_index().duplicated().any():
+        ds[dim].diff(dim).plot.line('.',ms='7',label='Time series with duplicates') 
+        print(ds[dim].to_index()[ds[dim].to_index().duplicated()])
+        
+        test = ds.sel(T=~ds[dim].to_index().duplicated())
+        test[dim].diff(dim).plot.line('.',ms='4',label='Duplicates removed') 
+        plt.legend()
+        if remove==True:
+            return test
 
 def rename_vars(ds,var_str):
     ds_new = xr.Dataset()
@@ -238,11 +254,10 @@ def CM_linear_upper_values(var,moor,std_win,stddy_tol,nloop,dim_x,dim_y,graphics
             ).where(mask)
     return var_i
 
-def repeat_upper_values(var):
-    mask = var.notnull()
-    mask = mask + var.shift(PRES=-10).notnull()
+def repeat_upper_values(var,dim='PRES'):
+    mask = var.bfill(dim=dim).notnull()
     var = var.interpolate_na(
-        dim='PRES',
+        dim=dim,
         method="nearest",
         fill_value="extrapolate",
     ).where(mask)
@@ -342,18 +357,21 @@ def calc_sigma0(ds):
 
 
 
-def calc_SA_CT_sigma0(ds):
-    
-    ds = ds.rename({'TIME':'time',
-                            'LATITUDE':'lat',
-                            'LONGITUDE':'lon',
-                            'DEPTH':'depth',
-                            'VELO':'vel',
-                            'TEMP':'temp',
-                            'SAL':'psal'})
-    ds['lat']=('lon',ds.lat.values)
-    dt='12hr'
-    ds['time']=ds.time - pd.Timedelta(dt)
+def calc_SA_CT_sigma0(ds, case='moor'):
+
+    if case=='moor':
+        ds = ds.rename({'TIME':'time',
+                                'LATITUDE':'lat',
+                                'LONGITUDE':'lon',
+                                'DEPTH':'depth',
+                                'VELO':'vel',
+                                'TEMP':'temp',
+                                'SAL':'psal'})
+        ds['lat']=('lon',ds.lat.values)
+        dt='12hr'
+        ds['time']=ds.time - pd.Timedelta(dt)
+        
+
     CT_attrs = {'long_name':'Conservative temperature',
               'description':'conservative temperature TEOS-10',
               'units':'degC'}
@@ -376,9 +394,13 @@ def calc_SA_CT_sigma0(ds):
                   dask = 'parallelized',output_dtypes=[float,])
     ds.SA.attrs = SA_attrs
 
-
-    ds['CT'] = xr.apply_ufunc(gsw.CT_from_t,
+    if case=='moor':
+        ds['CT'] = xr.apply_ufunc(gsw.CT_from_t,
                   ds.SA,ds.temp,ds.PRES,
+                  dask = 'parallelized',output_dtypes=[float,])
+    elif case=='ship':
+        ds['CT'] = xr.apply_ufunc(gsw.CT_from_pt,
+                  ds.SA,ds.ptmp,
                   dask = 'parallelized',output_dtypes=[float,])
     ds.CT.attrs = CT_attrs
 
@@ -416,7 +438,7 @@ def __butter_lowpass_filter(data, lowcut, fs, order=4):
 def lazy_butter_bp_filter(data, lowcut, highcut, fs,dim='time_counter'):
     y = xr.apply_ufunc(
         __butter_bandpass_filter,
-        data, lowcut, highcut, fs,
+        data.chunk({dim: -1}), lowcut, highcut, fs,
         input_core_dims=[[dim],[],[],[]],
         output_core_dims=[[dim]],
         dask='parallelized')
@@ -426,7 +448,7 @@ def lazy_butter_bp_filter(data, lowcut, highcut, fs,dim='time_counter'):
 def lazy_butter_lp_filter(data, lowcut, fs,dim='time_counter'):
     y = xr.apply_ufunc(
         __butter_lowpass_filter,
-        data, lowcut, fs,
+        data.chunk({dim: -1}), lowcut, fs,
         input_core_dims=[[dim],[],[]],
         output_core_dims=[[dim]],
         dask='parallelized')
@@ -721,12 +743,492 @@ def std_error_loop(ds):
                 ds[f'{var}_SE'].attrs = {'name':f'{var}_SE',
                         'long_name':f'Standard error of {var}',
                          'units':ds[var].units}
-                var_count +=1
-        elif '_se' in var:
-            print(f'{var} already in Dataset, will be overwritten')
-        elif ds[var].size==1:
-            print(f'{var} has length {ds[var].size}, no se calculated')
+                var_count +=1    
+    return ds
+
+################
+
+def xcorr_norm_optimized_access(x,y,dim):
+    """
+    Perform Cross-Correlation on x and y, ensuring efficient data access.
+    """
+    # Normalise variables using xarray methods
+    xnorm = (x - x.mean(dim)) / (x.std(dim) * len(x[dim])) # use len(x[dim]) for consistency
+    ynorm = (y - y.mean(dim)) / y.std(dim)
+
+    # Pass the underlying NumPy arrays to the optimized Scipy function
+    # This avoids potential xarray wrappers within the inner loop of signal.correlate
+    corr = signal.correlate(xnorm.values, ynorm.values, mode="full")
+    lags = signal.correlation_lags(len(xnorm.values), len(ynorm.values), mode="full")
+    
+    # Return as xarray DataArrays if you need them downstream (which you do, for np.trapz in decorrelation)
+    # Recreate the xarray DataArray structure for the correlation output
+    corr_da = xr.DataArray(corr, coords={'lags': lags}, dims=['lags'])
+    lags_da = xr.DataArray(lags, coords={'lags': lags}, dims=['lags'])
+
+    return corr_da, lags_da
+
+# Add numba optimization to the decorrelation function where possible
+@njit
+def integrate_correlation(C, lags, Imin, Imax, len_y):
+    # This part can be safely jitted
+    dcl = np.trapz(C[Imin:Imax], lags[Imin:Imax])
+    dof = len_y / dcl
+    return dcl, dof
+
+def decorrelation_optimized(x,y,dim,doplot,precision=2,print_text=False):
+    # The xcorr_norm function likely cannot be jitted if it uses xarray objects internally
+    C,lags = xcorr_norm(x,y,dim) 
+    # ... (rest of the index finding logic) ...
+    idx2 = int((len(C)+1)/2)
+    # ... (find idx) ...
+    
+    if idx>0:
+        Imin,Imax= idx2-idx-1,idx2+idx
+        # Use the jitted function for the integration step
+        dcl, dof = integrate_correlation(C.values, lags.values, Imin, Imax, len(y))
+    # ... (rest of the logic for idx==0, printing, plotting) ...
+    return dcl,dof
+
+
+## Standard error (Refined)
+def std_error_refined(da, dim='TIME'):
+    da_std = da.std(dim=dim)
+    # Perform fillna once here before passing to decorrelation
+    da_filled = da.fillna(0)
+    _, dof = decorrelation(da_filled, da_filled, dim, 0)
+    return da_std / np.sqrt(dof)
+
+def std_error_loop_optimized(ds):
+    """
+    Uses xarray/dask deferred computation for speed.
+    """
+    ds_vars = ds.data_vars
+    new_vars_to_add = {}
+
+    for var in ds_vars:
+        if ('_SE' not in var.upper()) and (ds[var].size > 1):
+            # The calculation is assigned, but NOT computed yet
+            da_se = std_error_refined(ds[var]) # Use the refined function
+
+            # Store the operation and metadata
+            new_vars_to_add[f'{var}_SE'] = da_se.assign_attrs({
+                'name':f'{var}_SE',
+                'long_name':f'Standard error of {var}',
+                 'units':ds[var].attrs.get('units', 'unknown')
+            })
+
+    # Execute all computations simultaneously and merge back
+    if not new_vars_to_add:
+        return ds
+
+    # Create a new Dataset from the scheduled tasks and compute once
+    ds_se = xr.Dataset(new_vars_to_add).compute() 
+    
+    # Merge the new standard error variables into the original dataset
+    ds = ds.merge(ds_se,compat='no_conflicts')
     
     return ds
 
 
+def generate_stats_table(ds, ds_pro, filename_tex, region_str):
+    """
+    Calculates statistics, prints to console, and saves a LaTeX table.
+
+    Inputs:
+        ds           : Xarray Dataset containing 'Qf' (full calc) and 'Qh' (full calc)
+        ds_pro       : Xarray Dataset containing 'Qf' (profile calc) and 'Qh' (profile calc)
+        filename_tex : String specifying the output .tex filename (e.g., 'stats_MB.tex')
+        region_str   : String label for the region (e.g., 'Mid-Basin (MB)')
+    """
+
+    # Extract the relevant integrated transport DataArrays from the Datasets
+    # Use .values to work with underlying numpy arrays or keep as DataArrays for alignment
+    Qf = ds['Qf']
+    Qf_pro = ds_pro['Qf']
+    Qh = ds['Qh']
+    Qh_pro = ds_pro['Qh']
+
+    # Ensure alignment (xarray automatically aligns on coordinates, but this is good practice)
+    Qf, Qf_pro = xr.align(Qf, Qf_pro)
+    Qh, Qh_pro = xr.align(Qh, Qh_pro)
+
+    # Calculate differences (for MBE and RMSE)
+    Qf_diff = Qf - Qf_pro
+    Qh_diff = Qh - Qh_pro
+
+    # Define the scaling factor (10e-2 = 0.01)
+    scale_factor = 1e-2
+    
+    # Define a helper function for scaling and calculating stats
+    def calculate_scaled_stats(data_full, data_pro, data_diff, scale):
+        stats = {}
+        # Use skipna=True (equivalent to 'omitnan' in MATLAB)
+        stats['mean_full'] = data_full.mean(skipna=True).item() / scale
+        stats['mean_pro']  = data_pro.mean(skipna=True).item() / scale
+        stats['std_full']  = data_full.std(skipna=True).item() / scale
+        stats['std_pro']   = data_pro.std(skipna=True).item() / scale
+        stats['mbe']       = data_diff.mean(skipna=True).item() / scale
+        # RMSE manual calculation using numpy functions on the underlying data
+        stats['rmse']      = np.sqrt(((data_full - data_pro)**2).mean(skipna=True).item()) / scale
+        return stats
+
+    # Calculate all stats in one go
+    stats_Qf = calculate_scaled_stats(Qf, Qf_pro, Qf_diff, scale_factor)
+    stats_Qh = calculate_scaled_stats(Qh, Qh_pro, Qh_diff, scale_factor)
+
+
+    ### 2. Print stats to Python console (using f-strings for formatting)
+
+    print(f"\nStatistics Summary for Region: {region_str}")
+    print("####################################################")
+    # Using format specifiers in f-strings: {var: >width.precisionf}
+    print(f"{'Metric':<20} {'Qf (10e-2 Sv)':>15} {'Qh (10e-2 PW)':>15}")
+    print("####################################################")
+
+    print(f"{'Mean full':<20} {stats_Qf['mean_full']:>15.4f} {stats_Qh['mean_full']:>15.4f}")
+    print(f"{'Mean profile':<20} {stats_Qf['mean_pro']:>15.4f} {stats_Qh['mean_pro']:>15.4f}")
+    print(f"{'Mean Bias':<20} {stats_Qf['mbe']:>15.4f} {stats_Qh['mbe']:>15.4f}")
+    print("----------------------------------------------------")
+    print(f"{'Std Dev full':<20} {stats_Qf['std_full']:>15.4f} {stats_Qh['std_full']:>15.4f}")
+    print(f"{'Std Dev profile':<20} {stats_Qf['std_pro']:>15.4f} {stats_Qh['std_pro']:>15.4f}")
+    print(f"{'RMSE':<20} {stats_Qf['rmse']:>15.4f} {stats_Qh['rmse']:>15.4f}")
+    print("####################################################\n")
+
+
+    ### 3. Print as LaTeX table to the specified file
+
+    # Python uses 'with open(...) as f:' context manager which safely handles file closing
+    try:
+        with open(filename_tex, 'w') as f: 
+            # Write LaTeX table preamble
+            f.write('\\begin{table}[h!]\n')
+            f.write('\\centering\n')
+            f.write(f'\\caption{{Summary of Qf and Qh Statistics for {region_str} (Units are in $10^{{-2}}$ Sv and $10^{{-2}}$ PW)}}\n')
+            f.write(f'\\label{{tab:stats_summary_{region_str.replace(" ", "_").replace("-", "")}}}\n')
+            f.write('\\begin{tabular}{|l|c|c|}\n')
+            f.write('\\hline\n')
+
+            # Write LaTeX table header row
+            f.write('Metric & Qf (10e-2 Sv) & Qh (10e-2 PW) \\\\\n')
+            f.write('\\hline\n')
+            f.write('\\hline\n')
+
+            # Write data rows (%.4f format specifiers)
+            f.write(f"Mean full & {stats_Qf['mean_full']:.4f} & {stats_Qh['mean_full']:.4f} \\\\\n")
+            f.write(f"Mean profile & {stats_Qf['mean_pro']:.4f} & {stats_Qh['mean_pro']:.4f} \\\\\n")
+            f.write(f"Mean Bias & {stats_Qf['mbe']:.4f} & {stats_Qh['mbe']:.4f} \\\\\n")
+            f.write('\\hline\n')
+            f.write(f"Std Dev full & {stats_Qf['std_full']:.4f} & {stats_Qh['std_full']:.4f} \\\\\n")
+            f.write(f"Std Dev profile & {stats_Qf['std_pro']:.4f} & {stats_Qh['std_pro']:.4f} \\\\\n")
+            f.write(f"RMSE & {stats_Qf['rmse']:.4f} & {stats_Qh['rmse']:.4f} \\\\\n")
+            f.write('\\hline\n')
+
+            # Write LaTeX table postamble
+            f.write('\\end{tabular}\n')
+            f.write('\\end{table}\n')
+        
+        print(f"Successfully saved LaTeX table to: {filename_tex}")
+
+    except IOError as e:
+        print(f"Error writing to file {filename_tex}: {e}")
+
+## Updated trends ###############################################
+def calculate_dt_days(dataset_time_coord):
+    """
+    Safely calculates the time step duration in days from an xarray time coordinate.
+    """
+    if len(dataset_time_coord) < 2:
+        raise ValueError("Time coordinate must have at least 2 steps.")
+
+    # Get the precise difference as a pandas Timedelta
+    dt_timedelta = pd.to_timedelta(np.diff(dataset_time_coord.values)[0])
+    
+    # Convert the timedelta to a numeric value representing total days
+    dt_days = dt_timedelta.total_seconds() / (60 * 60 * 24)
+    
+    return dt_days
+
+def calculate_and_format_trends(dataset):
+    """
+    Calculates Hamed and Rao modified MK trends for variables in an xarray dataset,
+    excluding QS variables.
+    Formats the results into structured pandas DataFrames with separate columns for
+    Trend and P-value, and saves them as a specific LaTeX table format.
+
+    Args:
+        dataset (xr.Dataset): The input xarray dataset containing variables like Q_MB, Q_lp_MB etc.
+    """
+    results_list = []
+
+    # Scale trend to 10 years:
+    # Assuming 'TIME' or 'time' exists and is correct in the dataset
+    time_coord_name = 'time' if 'time' in dataset.coords else 'TIME'
+
+    dt_days = calculate_dt_days(dataset[time_coord_name])
+    scale_factor_10yr = (10 * 365.25) / dt_days
+    
+    print(f"Detected time step duration (dt): {dt_days} days")
+    print(f"10-year scaling factor: {scale_factor_10yr:.2f} time steps per 10 years")
+    print("-" * 50)
+
+    # Iterate through variables and perform the test
+    for var_name in dataset.data_vars:
+        # Skip variables that start with QS
+        if var_name.startswith('QS'):
+            continue
+
+        data = dataset[var_name]
+        
+        if data.size > 1:
+            try:
+                series_data = data.to_pandas()
+                result = mk.hamed_rao_modification_test(series_data)
+                
+                # Scale the slope to a 10-year trend value
+                scaled_slope = result.slope * scale_factor_10yr
+                
+                results_list.append({
+                    'Variable': var_name,
+                    'Trend_Value': scaled_slope, # Renamed to avoid confusion with formatted string
+                    'P_value_Numeric': result.p # Renamed to store numeric value for comparison
+                })
+
+            except Exception as e:
+                print(f"Could not calculate trend for {var_name}: {e}")
+                results_list.append({
+                    'Variable': var_name,
+                    'Trend_Value': np.nan,
+                    'P_value_Numeric': np.nan
+                })
+
+    # Convert results list to a DataFrame
+    results_df = pd.DataFrame(results_list)
+    
+    # Filter out variables ending in _total or _total_lp for the main tables
+    filtered_df = results_df[~results_df['Variable'].str.contains('_total|_tot_')]
+
+    # Split into 'lp' (low pass) and 'main' dataframes
+    df_lp = filtered_df[filtered_df['Variable'].str.contains('_lp')]
+    df_main = filtered_df[~filtered_df['Variable'].str.contains('_lp')]
+
+    def create_latex_table(df, filename_stem):
+        # Extract the site (MB, EW, WW) and the variable name (Q, Qh, Qf)
+        df['Site'] = df['Variable'].str.rsplit('_', n=1).str[-1]
+        # .str[0] is needed to select the first element after the split
+        df['VarName'] = df['Variable'].str.replace('_lp', '').str.rsplit('_', n=1).str[0]
+        
+        # Initialize new columns for the *formatted strings* for the table body
+        df['Formatted_Trend'] = np.nan
+        df['Formatted_Pvalue'] = np.nan
+        
+        # Apply specific formatting based on variable name and bold for significance
+        
+        def format_and_bold(row, is_p_value=False):
+            value_numeric = row['P_value_Numeric'] if is_p_value else row['Trend_Value']
+            var_name = row['VarName']
+            
+            if pd.isna(value_numeric):
+                return '-'
+
+            # Q formatting
+            if var_name == 'Q':
+                fmt_str = "{:3.2f}"
+            # Qh and Qf formatting
+            else: 
+                if is_p_value:
+                    fmt_str = "{:4.3f}"
+                else:
+                    value_numeric *= 1e2 # Apply 1e2 scale for display
+                    fmt_str = "{:3.2f}"
+            
+            val_formatted = fmt_str.format(value_numeric)
+
+            # Apply bolding based on P_value_Numeric column
+            if row['P_value_Numeric'] <= 0.05:
+                return f"\\textbf{{{val_formatted}}}"
+            else:
+                return val_formatted
+
+        df['Formatted_Trend'] = df.apply(lambda row: format_and_bold(row, is_p_value=False), axis=1)
+        df['Formatted_Pvalue'] = df.apply(lambda row: format_and_bold(row, is_p_value=True), axis=1)
+
+        # Create pivoted tables using the NEW formatted string columns
+        trends_table_str = df.pivot(index='VarName', columns='Site', values='Formatted_Trend')
+        p_values_table_str = df.pivot(index='VarName', columns='Site', values='Formatted_Pvalue')
+
+        # Combine into a MultiIndex column DataFrame, ensuring WW, MB, EW order
+        site_order = ['WW', 'MB', 'EW']
+        
+        # Create empty combined table with desired structure
+        final_table = pd.DataFrame(index=trends_table_str.index, columns=pd.MultiIndex.from_product([site_order, ['Trend', 'P-value']]))
+
+        # Fill the combined table with data
+        for site in site_order:
+            if site in trends_table_str.columns:
+                final_table[(site, 'Trend')] = trends_table_str[site]
+                final_table[(site, 'P-value')] = p_values_table_str[site]
+
+        # Reorder rows to the specified order (Q, Qh, Qf)
+        var_order = ['Q', 'Qh', 'Qf']
+        final_table = final_table.reindex(index=var_order)
+        
+        # Rename row index with units (using LaTeX math environment for units)
+        final_table = final_table.rename(index={'Q': '$Q$ (Sv)', 
+                                                'Qh': '$Q_h$ (10$^{-2}$ PW)', 
+                                                'Qf': '$Q_f$ (10$^{-2}$ Sv)'})
+
+        # --- Generate the specific LaTeX string manually to match the desired format ---
+        latex_filename = f'{filename_stem}.tex'
+        
+        latex_string = "\\begin{table}\n"
+        latex_string += "\t\\caption{10 year trends and p-value for volume ($ Q $), heat ($ Q_{h} $) and freshwater ($ Q_{f} $) transport after \\citep{Hamed1998}.}\n"
+        latex_string += "\t\\begin{tabular}{|l|cc|cc|cc|}\n"
+        latex_string += "\t\t\\hline\n"
+        latex_string += "\t\t& \\multicolumn{2}{c|}{\\textbf{Western wedge}} & \\multicolumn{2}{c|}{\\textbf{Mid basin}} & \\multicolumn{2}{c|}{\\textbf{Eastern wedge}} \\\\\n"
+        latex_string += "\t\t& Trend & P-value & Trend & P-value & Trend & P-value \\\\\n"
+        latex_string += "\t\t\\hline\n"
+        
+        # Add the data rows
+        for index, row in final_table.iterrows():
+            # Use final_table structure which has MultiIndex columns
+            row_str = f"\t\t{index} & {row[('WW', 'Trend')]} & {row[('WW', 'P-value')]} & {row[('MB', 'Trend')]} & {row[('MB', 'P-value')]} & {row[('EW', 'Trend')]} & {row[('EW', 'P-value')]} \\\\\n"
+            # Ensure NaNs are handled correctly (pandas default is 'nan' string if conversion fails earlier)
+            row_str = row_str.replace('nan', '-')
+            latex_string += row_str
+            
+        latex_string += "\t\t\\hline\n"
+        latex_string += "\t\\end{tabular}\n"
+        latex_string += "\\end{table}"
+
+        # Save the manually generated LaTeX string to a file
+        with open(latex_filename, 'w') as f:
+            f.write(latex_string)
+
+        print(f"\nSuccessfully saved LaTeX table to {latex_filename}")
+        
+        return final_table
+
+    # Generate and print the tables
+    print("\n" + "="*50)
+    print("Main Variables Trend Table (Excluding QS, Formatted for LaTeX)")
+    print("="*50)
+    main_table = create_latex_table(df_main.copy(), 'Q_trend_all')
+    display(main_table)
+    
+    print("\n" + "="*50)
+    print("Low Pass Variables Trend Table (Excluding QS, Formatted for LaTeX)")
+    print("="*50)
+    lp_table = create_latex_table(df_lp.copy(), 'Q_lp_all')
+    display(lp_table)
+    
+    return main_table, lp_table
+
+    ################################
+
+def calculate_lombscargle_spectrum(q_moored: xr.DataArray, dim: str = 'TIME') -> xr.DataArray:
+    """
+    Calculates the Lomb-Scargle Periodogram for cycles between 5 years and the 
+    Nyquist frequency of the data, with results in Cycles Per Day (cpd).
+    """
+    
+    if dim not in q_moored.dims:
+        raise ValueError(f"Dimension '{dim}' not found in the input DataArray.")
+
+    # 1. Extract the time values (relative days from start time) and data values
+    time_numeric = (q_moored[dim].values - q_moored[dim].values[0]) / np.timedelta64(1, 'D')
+    data_values = q_moored.values
+
+    # Handle potential NaNs in your data by filtering them out for Lomb-Scargle
+    valid_indices = ~np.isnan(data_values)
+    t = time_numeric[valid_indices]
+    x = data_values[valid_indices]
+    
+    # Check if we have enough data points to proceed
+    if len(t) < 10:
+        raise ValueError("Not enough valid data points to perform spectral analysis.")
+
+    # 2. Define the frequencies to scan (in Cycles Per Day (cpd))
+
+    # Dynamically calculate the average sampling interval (dt_avg) in DAYS
+    dt_avg_days = np.mean(np.diff(t))
+    
+    # Nyquist frequency is 1 / (2 * dt_avg_days)
+    # The highest frequency you can reliably measure is half the average sampling rate
+    max_freq = 1.0 / (2.0 * dt_avg_days)
+    
+    # Minimum frequency is based on your requirement (5 years = ~1826 days)
+    min_freq = 1.0 / (5 * 365.25) 
+    
+    num_freqs = 2000 # Increased resolution for wide range
+
+    # Ensure min_freq is not higher than max_freq
+    freqs = np.linspace(min_freq, max_freq, num_freqs) 
+
+    # 3. Calculate the Lomb-Scargle Periodogram
+    power = signal.lombscargle(t, x, freqs, normalize=True) 
+
+    # 4. Convert the results back into an Xarray DataArray
+    spectrum_da = xr.DataArray(
+        power,
+        coords={"frequency_cpd": freqs},
+        dims=["frequency_cpd"]
+    )
+    
+    return spectrum_da
+
+######################
+
+def process_all_spectra(ds_input: xr.Dataset, dim: str = 'TIME') -> xr.Dataset:
+    """
+    Calculates the Lomb-Scargle spectrum for specific Q/Qh/Qf variables 
+    across different regions in the input Dataset.
+
+    Parameters
+    ----------
+    ds_input : xr.Dataset
+        The input dataset (e.g., RT_Q_Qh_Qf)
+    dim : str, optional
+        The name of the time dimension, by default 'TIME'.
+
+    Returns
+    -------
+    xr.Dataset
+        A new Dataset containing the frequency spectra for all valid variables.
+    """
+    
+    base_vars = ['Q', 'Qh', 'Qf']
+    regions = ['_MB', '_WW', '_EW', '_total']
+    
+    # Generate all potential variable names we are looking for
+    target_vars = [base + region for base in base_vars for region in regions]
+
+    # Dictionary to store the results
+    spectra_results = {}
+    
+    print(f"Starting spectral analysis for {len(target_vars)} potential variables...")
+
+    for var_name in target_vars:
+        if var_name in ds_input.data_vars:
+            print(f"  Processing variable: {var_name}")
+            # Select the single DataArray and run the calculation
+            ts_dataarray = ds_input[var_name].reset_coords()
+            ts_dataarray = ts_dataarray[var_name]
+            # Use the helper function to get the spectrum
+            try:
+                spectrum_da = calculate_lombscargle_spectrum(ts_dataarray, dim='TIME')
+                spectra_results[var_name + '_spectrum'] = spectrum_da
+            except ValueError as e:
+                print(f"  Skipping {var_name} due to error: {e}")
+        else:
+            print(f"  Variable {var_name} not found in input dataset. Skipping.")
+
+    if not spectra_results:
+        print("No spectra were successfully calculated.")
+        return None
+
+    # Combine all individual spectrum DataArrays into a single new Dataset
+    output_dataset = xr.Dataset(spectra_results)
+    
+    print(f"\nSuccessfully generated spectra for {len(output_dataset.data_vars)} variables.")
+    return output_dataset

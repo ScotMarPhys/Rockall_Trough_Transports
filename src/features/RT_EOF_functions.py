@@ -3,37 +3,32 @@ import scipy
 import numpy as np
 import xarray as xr
 import xeofs as xe
+import pandas as pd
+import cmocean as cm
 from matplotlib import pyplot as plt
 import src.features.RT_transport as rtt
+import src.features.RT_visualise as rtv
 
-def add_nan_glider_sections(ds_glider,dim='time'):
-    t1=np.datetime64('2020-09-01', 'ns')
-    t2=np.datetime64('2021-03-01', 'ns')
-    t3=np.datetime64('2021-09-01', 'ns')
-    t4=np.datetime64('2022-03-01', 'ns')
-    t5=np.datetime64('2022-06-01', 'ns')
-    t6=np.datetime64('2022-10-01', 'ns')
-    dummy1=ds_glider.isel({dim:0})*np.nan
-    dummy1[dim]=t1
-    dummy2=ds_glider.isel({dim:0})*np.nan
-    dummy2[dim]=t2
-    dummy3=ds_glider.isel({dim:0})*np.nan
-    dummy3[dim]=t3
-    dummy4=ds_glider.isel({dim:0})*np.nan
-    dummy4[dim]=t4
-    dummy5=ds_glider.isel({dim:0})*np.nan
-    dummy5[dim]=t5
-    dummy6=ds_glider.isel({dim:0})*np.nan
-    dummy6[dim]=t6
-    ds_glider_nan = xr.concat([ds_glider.sel({dim:slice(None,t1)}),dummy1,
-                              ds_glider.sel({dim:slice(t1,t2)}),dummy2,
-                              ds_glider.sel({dim:slice(t2,t3)}),dummy3,
-                              ds_glider.sel({dim:slice(t3,t4)}),dummy4,
-                              ds_glider.sel({dim:slice(t4,t5)}),dummy5,
-                              ds_glider.sel({dim:slice(t5,t6)}),dummy6,
-                              ds_glider.sel({dim:slice(t6,None)}),
-                              ],
-                             dim=dim)
+def add_nan_glider_sections(ds_glider,dim='time',gap='16 day'):
+    time_diff = ds_glider[dim].diff(dim)
+    gap_mask = time_diff > pd.Timedelta(gap)
+    test = gap_mask[dim].where(gap_mask,drop=True)-pd.Timedelta('1 day')
+    for i,t1 in enumerate(test):
+        dummy1=ds_glider.isel({dim:0})*np.nan
+        dummy1[dim]=t1
+        if i==0:
+            ds_glider_nan = xr.concat([ds_glider.sel(
+                {dim:slice(None,t1)}),dummy1],
+                                 dim=dim)    
+        else:
+            ds_glider_nan = xr.concat([ds_glider_nan,ds_glider.sel(
+                {dim:slice(test.isel({dim:i-1}),t1)}),dummy1],
+                                 dim=dim)
+        if i==len(test)-1:
+            ds_glider_nan = xr.concat([ds_glider_nan,ds_glider.sel(
+                {dim:slice(t1,None)})],
+                                 dim=dim)
+    
     return ds_glider_nan
 
 def normalize(x=None, y=None):
@@ -187,37 +182,73 @@ def rec_v_sec(ds_X,ds_y,glider_EOF,glider_vcur,HEOF=False,TIME_dim='TIME'):
     return v_rec_sec
 
 def calc_transport(da_v):
-    dx = gsw.distance(da_v.lon[:2],da_v.lat[:2])
-    dz = rtt.get_dz(da_v.depth)
+    dx = rtt.get_dx(da_v.lon,da_v.lat,dim='lon')
+    dz = rtt.get_dz(np.abs(da_v.depth))
     T = ((da_v.rename('Q')*dx*dz).sum(['lon','depth'])*1e-6)
     T.attrs = {'long_name':'Meridional Transport','units':'Sv'}
     return T
 
+def calc_transport_VHF(ds,dims,sec_str):
+    dx = gsw.distance(ds.vcur.lon[:2],ds.lat[:2])
+    dz = rtt.get_dz(ds.vcur.depth)
+    q = ds.vcur.rename('q')*dx*dz
+    Q = q.sum(dims)*1e-6
+    Q.attrs = {'long_name':'Volume Transport','units':'Sv'}
+
+    ds_Q,ds_q = rtt.calc_transports(Q,q,ds.CT,ds.SA,dims,sec_str)
+    
+    return ds_Q,ds_q
+
 ### visualisation functions
 
-def plot_mean_section(ds_glider,ds_q_RT,v_rec,mode_no=1,mean=False):
+def plot_mean_section(ds_glider,ds_q_RT,v_rec,mode_no=1,mean=False,var_str='v'):
     
     fig,axs = plt.subplots(1,4,figsize=[15,3])
-    vmin,vmax,levs=-0.2,0.2,41
+    
+    sal_levs = np.arange(35.2,35.7,.05)
+
+    if var_str=='v':
+        levs=np.linspace(-0.2,0.2,41)
+        cmap='RdBu_r'
+        da_glider = ds_glider.vcur
+        da_moor = ds_q_RT.v
+        title_str='Merid. Vel. [m/s]'
+    elif var_str=='CT':
+        levs = np.arange(5,15,.5)
+        cmap = cm.cm.thermal
+        da_glider = ds_glider.CT
+        da_moor = ds_q_RT.CT
+        title_str=r'Cons. Temp. [$\degree$C]'
+    elif var_str=='SA':
+        levs = np.arange(35.2,35.7,.05)
+        cmap = cm.cm.haline
+        da_glider = ds_glider.SA
+        da_moor = ds_q_RT.SA
+        title_str='Abs. Sal [g/kg]'
+
     ax=axs[0]
-    ds_glider.vcur.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
-                                       vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+    da_glider.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
+                                       levels=levs,cmap=cmap,
+                            cbar_kwargs={'label': title_str})
     ax.set_title('Glider')
     ax=axs[1]
-    ds_q_RT.v.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
-                                  vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+    da_moor.mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
+                                  levels=levs,cmap=cmap,
+                            cbar_kwargs={'label': title_str})
     ax.set_title('RT EW full')
     v_EOF = v_rec.sel(mode=mode_no)
     if mean:
         v_EOF = v_EOF.mean('mode')        
     ax=axs[2]
     v_EOF.mean('TIME').plot(x='lon',ax=ax,yincrease=False,
-                            vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+                            levels=levs,cmap=cmap,
+                            cbar_kwargs={'label': title_str})
     ax.set_title(f'EOF {mode_no} full')
     ax=axs[3]
     v_EOF.interp(TIME=ds_glider.TIME.values
                     ).mean(['TIME']).plot(x='lon',ax=ax,yincrease=False,
-                                          vmin=vmin,vmax=vmax,levels=levs,cmap='RdBu_r')
+                                          levels=levs,cmap=cmap,
+                                        cbar_kwargs={'label': title_str})
     ax.set_title(f'EOF {mode_no} resampled')
     plt.tight_layout()
 
@@ -263,28 +294,195 @@ def plot_longterm(ds_glider,ds_q_RT,v_rec,ax=0,mode_no=1,mean=False):
     ax.legend()
     ax.grid()
 
+def plot_linregress(var_1, var_2,axs=0,t_dim='TIME',
+                    label_str = 'EW', xlabel_str='Observed', ylabel_str='Reconstructed',
+                    unit_str='Sv', ylim=[-5,5], xlim=[-5,5]):
 
-def plot_error(da_Q_obs,da_Q_rec,mode,axs):
+    result = scipy.stats.linregress(var_1,var_2)
+    RMSE = np.sqrt(((var_1 - var_2)**2).mean(t_dim))
+    
+    axs.plot(var_1,var_2,'.',
+         label=f'{label_str}, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:.2e} {unit_str}, \nSTDE={result.stderr:.2e} ')
+        
+    axs.plot(np.arange(-7,50),np.arange(-7,50),color='k',lw=0.8,ls='--')
+    axs.set_xlabel(xlabel_str)
+    axs.set_ylabel(ylabel_str)
+    axs.set_ylim(ylim)
+    axs.set_xlim(xlim)
+    
+    axs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2))
+    axs.set_aspect('equal', adjustable='box')
+    axs.grid()
+    axs.axvline(0,color='k',lw=0.8,ls='--')
+    axs.axhline(0,color='k',lw=0.8,ls='--')
+
+#####################
+def plot_error_paper(da_Q_obs,da_Q_rec,mode,axs,fig,var_str='Q',title_str='EW',t_dim='TIME'):
+    if var_str=='Q':
+        unit_str = 'Sv'    
+    elif var_str=='Qh':
+        unit_str = 'PW'    
+    elif var_str=='Qf':
+        unit_str = 'Sv'
+    elif var_str=='CT':
+        unit_str = r'$\degree$C'
+    elif var_str=='SA':
+        unit_str = 'g/kg'
+
+    c_line = ['k','r','b']
+    symbols = ['x','1','+']
+    ms=10
     
     if mode==0:
         Q_rec = da_Q_rec
         result = scipy.stats.linregress(Q_rec,da_Q_obs)
-        RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('TIME'))
-        axs.plot(da_Q_obs,Q_rec,'.',
-             label=f'EW-F22, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
+        RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
+        axs.plot(Q_rec,da_Q_obs,symbols[mode],color=c_line[mode],
+                         markersize=ms,
+             label=f'{title_str}R={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE {result.stderr:3.2f} {unit_str},\np={result.pvalue:.3f}')
     else:
         for i in range(mode):
             Q_rec = da_Q_rec.isel(mode=i)
             result = scipy.stats.linregress(Q_rec,da_Q_obs)
-            RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean('TIME'))
-            axs.plot(da_Q_obs,Q_rec,'.',
-                     label=f'EW, {Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} Sv, \nSTDE={result.stderr:3.2f} ')
-    axs.plot(np.arange(-7,11),np.arange(-7,11),color='k',lw=0.8,ls='--')
-    axs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2))
-    axs.set_xlabel('Observed transport')
-    axs.set_ylabel('Reconstructed transport')
-    axs.set_ylim([-3,11])
-    axs.set_xlim([-6,10])
+            RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
+            if i==0:
+                axs.plot(da_Q_obs,Q_rec,symbols[i],color=c_line[i],
+                         markersize=ms,
+                         label=f'{title_str}{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} {unit_str}, \np={result.pvalue:.3f} ')
+            else:
+                axs.plot(da_Q_obs,Q_rec,symbols[i],color=c_line[i],
+                         markersize=ms,
+                     label=f'{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f} {unit_str}, \np={result.pvalue:.3f} ')
+    
+    axs.plot(np.arange(-50,50),np.arange(-50,50),color='k',lw=0.8,ls='--')
+    if var_str=='Q':
+        axs.set_ylabel('Observed transport (Sv)')
+        axs.set_xlabel('Reconstructed transport (Sv)')
+        axs.set_ylim([-8,8])
+        axs.set_xlim([-8,8])
+        
+    if var_str=='Qh':
+        axs.set_ylabel('Observed heat transport')
+        axs.set_xlabel('Reconstructed heat transport')
+        axs.set_ylim([-6,6]*1e-2)
+        axs.set_xlim([-6,6]*1e-2)
+        
+    if var_str=='Qf':
+        axs.set_ylabel('Observed transport')
+        axs.set_xlabel('Reconstructed transport')
+        axs.set_ylim([-4,4]*1e-2)
+        axs.set_xlim([-4,4]*1e-2)
+    elif var_str=='CT':
+        axs.set_ylabel('Observed CT')
+        axs.set_xlabel('Reconstructed CT')
+        axs.set_ylim([7,12.5])
+        axs.set_xlim([7,12.5])
+    elif var_str=='SA':
+        axs.set_ylabel('Observed SA')
+        axs.set_xlabel('Reconstructed SA')
+        axs.set_ylim([35.3,35.6])
+        axs.set_xlim([35.3,35.6])
+    
+    # # --- Robust Legend Placement Logic ---
+    # spec = axs.get_subplotspec()
+    # is_left_col = spec.is_first_col()
+    # is_top_row = spec.is_first_row()
+
+    # # Define vertical anchor and location
+    # if is_top_row:
+    #     # Top row: Anchor legend to the bottom of the legend box
+    #     vertical_anchor = 0     # bbox Y coordinate
+    #     vertical_loc = 'lower'  # loc setting (e.g., 'lower left')
+    # else:
+    #     # Bottom row: Anchor legend to the top of the legend box
+    #     vertical_anchor = 1     # bbox Y coordinate
+    #     vertical_loc = 'upper'  # loc setting (e.g., 'upper left')
+    
+    # # Define horizontal anchor and location
+    # if is_left_col:
+    #     # Left column: Place legend to the left side
+    #     horizontal_anchor = -0.3
+    #     horizontal_loc = 'right' # e.g., 'lower right' or 'upper right'
+    # else:
+    #     # Right column: Place legend to the right side
+    #     horizontal_anchor = 1.05
+    #     horizontal_loc = 'left' # e.g., 'lower left' or 'upper left'
+
+    # # Combine horizontal and vertical loc strings (e.g., 'upper left')
+    # final_loc = f'{vertical_loc} {horizontal_loc}'
+
+    # # Place the legend
+    # axs.legend(bbox_to_anchor=(horizontal_anchor, vertical_anchor), 
+    #            loc=final_loc)
+
+    axs.legend(markerscale=2.,bbox_to_anchor=(0, -.2), loc='upper left')
+    axs.set_aspect('equal', adjustable='box')
+    axs.grid()
+    axs.axvline(0,color='k',lw=0.8,ls='--')
+    axs.axhline(0,color='k',lw=0.8,ls='--')
+
+#####################
+def plot_error(da_Q_obs,da_Q_rec,mode,axs,var_str='Q',title_str='EW',t_dim='TIME'):
+    if var_str=='Q':
+        unit_str = 'Sv'    
+    elif var_str=='Qh':
+        unit_str = 'PW'    
+    elif var_str=='Qf':
+        unit_str = 'Sv'
+    elif var_str=='CT':
+        unit_str = r'$\degree$C'
+    elif var_str=='SA':
+        unit_str = 'g/kg'
+    
+    
+    if mode==0:
+        Q_rec = da_Q_rec
+        result = scipy.stats.linregress(Q_rec,da_Q_obs)
+        RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
+        axs.plot(Q_rec,da_Q_obs,'.',
+             label=f'{title_str}R={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE {result.stderr:3.2f},\np={result.pvalue:.3f}')
+    else:
+        for i in range(mode):
+            Q_rec = da_Q_rec.isel(mode=i)
+            result = scipy.stats.linregress(Q_rec,da_Q_obs)
+            RMSE = np.sqrt(((da_Q_obs - Q_rec)**2).mean(t_dim))
+            if i==0:
+                axs.plot(da_Q_obs,Q_rec,'.',
+                         label=f'{title_str}{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f}, \np={result.pvalue:.3f} ')
+            else:
+                axs.plot(da_Q_obs,Q_rec,'.',
+                     label=f'{Q_rec.mode.values} EOFs, \nR={result.rvalue:3.2f}, \nRMSE={RMSE:3.2f} {unit_str}, \nSTDE={result.stderr:3.2f}, \np={result.pvalue:.3f} ')
+    
+    axs.plot(np.arange(-50,50),np.arange(-50,50),color='k',lw=0.8,ls='--')
+    if var_str=='Q':
+        axs.set_ylabel('Observed transport')
+        axs.set_xlabel('Reconstructed transport')
+        axs.set_ylim([-8,8])
+        axs.set_xlim([-8,8])
+        
+    if var_str=='Qh':
+        axs.set_ylabel('Observed heat transport')
+        axs.set_xlabel('Reconstructed heat transport')
+        axs.set_ylim([-6,6]*1e-2)
+        axs.set_xlim([-6,6]*1e-2)
+        
+    if var_str=='Qf':
+        axs.set_ylabel('Observed transport')
+        axs.set_xlabel('Reconstructed transport')
+        axs.set_ylim([-4,4]*1e-2)
+        axs.set_xlim([-4,4]*1e-2)
+    elif var_str=='CT':
+        axs.set_ylabel('Observed CT')
+        axs.set_xlabel('Reconstructed CT')
+        axs.set_ylim([7,12.5])
+        axs.set_xlim([7,12.5])
+    elif var_str=='SA':
+        axs.set_ylabel('Observed SA')
+        axs.set_xlabel('Reconstructed SA')
+        axs.set_ylim([35.3,35.6])
+        axs.set_xlim([35.3,35.6])
+
+    axs.legend(bbox_to_anchor=(-0.05, 1), loc='upper right')
     axs.set_aspect('equal', adjustable='box')
     axs.grid()
     axs.axvline(0,color='k',lw=0.8,ls='--')
@@ -303,18 +501,18 @@ def plot_transport(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
     ax.legend()
     ax.grid()
 
-def plot_seasonal_cycle_Q(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
+def plot_seasonal_cycle_Q(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False,show_leg=True,show_xl=True):
     color='C0'
     m=Q_glider.groupby('TIME.month').mean('TIME')
     d=Q_glider.groupby('TIME.month').std('TIME')
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, 
-                color=color,label='Glider')
+                color=color,label=f'Glider {rtv.date_str_func(Q_glider)}')
 
     color='C1'
     m = Q_moor.groupby('TIME.month').mean('TIME') 
     d=Q_moor.groupby('TIME.month').std('TIME')
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, 
-                color=color,label='RT EW full')
+                color=color,label=f'RT EW {rtv.date_str_func(Q_moor)}')
 
     v_EOF = Q_rec.sel(mode=mode_no)
     if mean:
@@ -324,7 +522,7 @@ def plot_seasonal_cycle_Q(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
     m = v_EOF.groupby('TIME.month').mean('TIME') 
     d=v_EOF.groupby('TIME.month').std('TIME')
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, 
-                color=color,label=f'EOF {mode_no} full')
+                color=color,label=f'EOF {mode_no} {rtv.date_str_func(v_EOF)}')
 
     color='C3'
     dummy = v_EOF.interp(TIME=Q_glider.TIME.values)
@@ -339,9 +537,146 @@ def plot_seasonal_cycle_Q(Q_glider,Q_rec,Q_moor,ax=0,mode_no=1,mean=False):
     d = Q_glider.sel(TIME=slice(None,v_EOF.TIME.max())
                     ).groupby('TIME.month').std('TIME')
     ax.errorbar(m.month, m, yerr=d, fmt='-', capsize=3, capthick=1, 
-                color=color,label=f'Glider 2020- Oct 2022')
+                color=color,label=f'Glider {rtv.date_str_func(Q_glider.sel(TIME=slice(None,v_EOF.TIME.max())
+                    ))}')
     
     ax.grid()
-    ax.legend(bbox_to_anchor=(0,1.02,1,0.2),loc='lower left',mode='expand',ncol=2)
-    ax.set_xlabel('Month of year')
+    if show_leg:
+        ax.legend(bbox_to_anchor=(0,1.02,1,0.2),loc='lower left',mode='expand',ncol=2)
+    if show_xl:
+        ax.set_xlabel('Month of year')
     ax.set_ylabel(f'{Q_glider.long_name} [{Q_glider.units}]')
+
+
+###################################################################
+def resample_to_glider_data(v_RTEB1,ds_glider,win_days = 1,t_dim='TIME',v='v'):
+    # Aerage regular mooring dataset onto the irregular time steps of glider dataset
+    # using a window of ±1 day
+    v_RTEB1=v_RTEB1.rename({t_dim:'time'})
+
+    # 2. Define the averaging window (±win_days day)
+    window_size = pd.Timedelta(days=win_days)
+    
+    # 3. Create an empty list to hold the averaged results
+    averaged_values = []
+
+    if v=='3D':
+        original_dims = v_RTEB1.dims
+        # Identify the non-time dimensions
+        non_time_dims = [dim for dim in original_dims if dim != 'time']
+        expected_non_time_order = tuple(non_time_dims)
+    
+    # 4. Loop through each irregular time step
+    for t_irreg in ds_glider.time.values:
+        # Define the time window for the regular data
+        start_time = t_irreg - window_size
+        end_time = t_irreg + window_size
+    
+        # Select the regular data within the window
+        # .sel(time=slice(start_time, end_time)) is the key step
+        data_in_window = v_RTEB1.sel(time=slice(start_time, end_time))
+        
+        # Check if there is any data in the window to avoid issues with empty selections
+        if data_in_window.size > 0:
+            # Average the data in the window
+            average_value = data_in_window.mean(dim='time')
+            if v=='3D':
+                average_value = average_value.transpose('lon', 'depth')
+            averaged_values.append(average_value.values)
+        else:
+            # Append NaN if no data is found for a given time window
+            averaged_values.append(np.nan)
+    
+    # 5. Create a new xarray DataArray with the averaged values
+    if v=='v':
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            coords={'time': ds_glider.time,
+                   'depth': v_RTEB1.depth*-1,
+                   'PRES': v_RTEB1.PRES},
+            dims=['time','depth']
+        )
+    if v=='hydro':
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            coords={'TIME': ds_glider.time.values,
+                   'depth': v_RTEB1.depth},
+            dims=['TIME','depth']
+        )
+    elif v=='m':
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            coords={'time': ds_glider.time,
+                   'mode': v_RTEB1.mode},
+            dims=['time','mode']
+        )
+    elif v=='3D':   
+        # display(averaged_values)
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            # coords={'time': ds_glider.time,
+            #        'depth': v_RTEB1.depth*-1,
+            #        'lon': v_RTEB1.lon.values},
+            # dims=['time','lon','depth']
+        )
+    else:
+        v_RTEB1_resampled = xr.DataArray(
+            averaged_values,
+            coords={'time': ds_glider.time},
+            dims=['time']
+        )
+        
+    return v_RTEB1_resampled
+
+
+###################
+def resample_to_glider_data_3d(v_RTEB1, ds_glider, win_days=1, t_dim='TIME'):
+    # Rename time dimension for consistency
+    v_RTEB1 = v_RTEB1.rename({t_dim: 'time'})
+    
+    # 2. Define the averaging window (±win_days day)
+    window_size = pd.Timedelta(days=win_days)
+    
+    # 3. Create an empty list to hold the averaged results (as xarray objects)
+    averaged_arrays = []
+    
+    # 4. Loop through each irregular time step
+    for t_irreg in ds_glider.time.values:
+        start_time = t_irreg - window_size
+        end_time = t_irreg + window_size
+    
+        data_in_window = v_RTEB1.sel(time=slice(start_time, end_time))
+        
+        if data_in_window.size > 0:
+            average_value = data_in_window.mean(dim='time')
+            # Append the xarray DataArray object itself, not .values
+            averaged_arrays.append(average_value) 
+        else:
+            # For empty windows, create a placeholder DataArray with NaNs 
+            # and the correct structure/dimensions to ensure consistency.
+            # We use the structure of the last good average or a template.
+            # A simple way for a template:
+            if averaged_arrays:
+                nan_placeholder = averaged_arrays[-1].copy(data=np.nan * averaged_arrays[-1].shape)
+                averaged_arrays.append(nan_placeholder)
+            else:
+                # If first iteration is empty, this needs a fallback. 
+                # For simplicity here, we assume the first window is usually not empty. 
+                # A more complex solution might require defining a template array first.
+                pass 
+                
+    # 5. Concatenate the list of xarray DataArrays along a new 'time' dimension
+    # This automatically handles consistent ordering of existing dimensions (depth, lon, mode)
+    if averaged_arrays:
+        v_RTEB1_resampled = xr.concat(averaged_arrays, dim='time')
+        # Assign the correct time coordinates from the glider data
+        v_RTEB1_resampled = v_RTEB1_resampled.assign_coords({"time": ds_glider.time})
+    else:
+        # Handle case where averaged_arrays is empty
+        return None 
+
+    # 6. Apply final coordinate remapping if necessary (moved outside of the loop/concat logic)
+    if 'depth' in v_RTEB1_resampled.coords:
+        v_RTEB1_resampled = v_RTEB1_resampled.assign_coords({"depth": v_RTEB1_resampled.depth * -1})
+        
+    return v_RTEB1_resampled

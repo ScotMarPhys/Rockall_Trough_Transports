@@ -33,7 +33,7 @@ To calculate the Rockall Trough Transport wihtout using glider data run notebook
 
 Note: To obtain Ekman transport estimate you will have to obatin monthly mean values of ERA5 horizontal wind stress. This function is not yet available in this repository. Alternatively, you can uncommand lines in the notebook regarding the Ekman transport, as it is neglectable (Houpert et al., 2020; Fraser et al., 2022)
 
-### New methodology included Glider data after Burmeister et al. (in prep)
+### New methodology included Glider data after Burmeister et al. (accepted)
 To calculate the Rockall Trough Transport using glider data to obtain a better representation of the European Slope Current run notebooks/3.0_Rockall_Trough_transports_2014_2024_v1.ipynb
 
 Note: To obtain Ekman transport estimate you first will have to obatin monthly mean values of ERA5 horizontal wind stress. This function is not yet available in this repository. Alternatively, you can uncommand lines in the notebook regarding the Ekman transport, as it is neglectable (Houpert et al., 2020; Fraser et al., 2022)
@@ -44,7 +44,7 @@ To perform an analysis of the dominant spatial pattern in the Glider sections us
 The other notebooks are used to produce nice figures for paper and presentations and may include additional data products and analysis. They are dependent on data output of lower order notebooks.
 
 ## Publications
-Burmeister, K., Fraser, N. J., Jones, S. C., Cunningham, S. A., Drysdale, L. A., Inall, M. E., Dotto, T. S., and Holliday, N. P.: Eight years of continuous Rockall Trough transport observations using moorings and gliders, EGUsphere [preprint], https://doi.org/10.5194/egusphere-2025-3167, 2025
+Burmeister, K., Fraser, N. J., Jones, S. C., Cunningham, S. A., Drysdale, L. A., Inall, M. E., Dotto, T. S., and Holliday, N. P. (2026): A decade of continuous Rockall Trough transport observations using moorings and gliders, Ocean Science, [accepted]. Preprint available at: https://doi.org/10.5194/egusphere-2025-3167.
 The following notebooks and matlab scripts produce most figures in Burmeister et al. (preprint):
 - notebooks/2.0_Rockall_Trough_glider_EW_EOF_2020_2025.ipynb
 - notebooks/9.0_Paper_Rokcall_Trough_Results.ipynb

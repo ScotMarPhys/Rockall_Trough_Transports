@@ -33,7 +33,7 @@ To calculate the Rockall Trough Transport wihtout using glider data run notebook
 
 Note: To obtain Ekman transport estimate you will have to obatin monthly mean values of ERA5 horizontal wind stress. This function is not yet available in this repository. Alternatively, you can uncommand lines in the notebook regarding the Ekman transport, as it is neglectable (Houpert et al., 2020; Fraser et al., 2022)
 
-### New methodology included Glider data after Burmeister et al. (accepted)
+### New methodology included Glider data after Burmeister et al. (2026)
 To calculate the Rockall Trough Transport using glider data to obtain a better representation of the European Slope Current run notebooks/3.0_Rockall_Trough_transports_2014_2024_v1.ipynb
 
 Note: To obtain Ekman transport estimate you first will have to obatin monthly mean values of ERA5 horizontal wind stress. This function is not yet available in this repository. Alternatively, you can uncommand lines in the notebook regarding the Ekman transport, as it is neglectable (Houpert et al., 2020; Fraser et al., 2022)

@@ -390,6 +390,90 @@ def plot_moorings_paper_A(ds_RT,ds_RT_stacked,cruise_label=True):
     return fig,axs
 
 ##########################################################
+def plot_moorings_paper_A_EB1(ds_RT,ds_RT_stacked,cruise_label=True):
+    
+    ds_cruises = rtd.load_cruise_list()
+    
+    fs=14
+    font = {'weight' : 'normal',
+            'size'   : fs}
+    plt.rc('font', **font)
+
+    sig_lev = np.array([27.2,27.4,27.6,27.7])
+    vel_lev = np.arange(-.5,.51,.125)
+    tem_levs = np.arange(-1.5,1.52,.25)
+    sal_levs = np.arange(-0.15,0.152,0.025)
+    
+    fig,axs = plt.subplots(2,1,figsize=[12/2,7],sharex=True,sharey=True)
+
+#     # EB1
+    sigma = gsw.sigma0(ds_RT.SG_EAST, ds_RT.TG_EAST)
+
+    ax = axs[0]
+    da = ds_RT.TG_EAST
+    imT = (da-da.mean('TIME')).plot(ax=ax,x='TIME',y='depth',yincrease=False,
+                       levels=tem_levs,cmap=cm.cm.balance,
+                       add_colorbar=False)
+    p=sigma.plot.contour(ax=ax,x='TIME',y='depth',
+                        levels=sig_lev,colors='grey',
+                        yincrease=False,linewidths=1)
+    # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
+    ds_RT_stacked.PS_EAST_TS.plot.line('k',ax=ax,x='TIME',hue='ZS_EAST_TS',add_legend=False,lw=0.5)
+
+    ax = axs[1]
+    da= ds_RT.SG_EAST
+    imS= (da-da.mean('TIME')).plot(ax=ax,x='TIME',y='depth',yincrease=False,
+                        levels=sal_levs, cmap=cm.cm.balance,
+                        add_colorbar=False)
+    p=sigma.plot.contour(ax=ax,x='TIME',y='depth',
+                        levels=sig_lev,colors='grey',
+                        yincrease=False,linewidths=1)
+    # plt.clabel(p,levels=sig_lev[::2],fmt='%3.1f',fontsize=fs)
+    ds_RT_stacked.PS_EAST_TS.plot.line('k',ax=ax,x='TIME',hue='ZS_EAST_TS',add_legend=False,lw=0.5)
+
+    for ax in axs:
+        ax.set_ylabel('Depth (m)')
+        ax.tick_params(axis='x', labelrotation=45)
+
+    for i, label in enumerate(('(a)', '(b)')):
+        ax =  axs[i]
+        ax.text(.0, 1.05, label+ ' EB1 mooring', transform=ax.transAxes,
+          fontsize=fs, ha='left',va='bottom')
+        ax.vlines(ds_cruises.TIME,0, 1,transform=ax.get_xaxis_transform(),color='k',linestyle='--')
+        ax.grid()
+        ax.set_xlabel('')
+    
+    if cruise_label:
+        for i,text in enumerate(ds_cruises[:-1]):
+            if i==0:
+                t=pd.to_datetime(ds_cruises[i].TIME.values)+datetime.timedelta(days=30)
+                axs[0,0].annotate(text.values, xy=(t,-10),
+                              ha ='right', va='bottom', rotation=-60)
+                axs[0,1].annotate(text.values, xy=(t,-10),
+                                  ha ='right', va='bottom', rotation=-60)
+            else:
+                axs[0,0].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
+                                  ha ='right', va='bottom', rotation=-60)
+                axs[0,1].annotate(text.values, xy=(ds_cruises[i].TIME,-10),
+                                  ha ='right', va='bottom', rotation=-60)
+
+    plt.tight_layout()
+    fig.subplots_adjust(right=0.90)
+    # cbar_ax = fig.add_axes([0.92, 0.69, 0.02, 0.25])
+    # cb =fig.colorbar(imV, cax=cbar_ax)
+    # cb.set_label('Meridional velocity Anomaly [m/s]')
+
+    cbar_ax = fig.add_axes([0.92, 0.56, 0.02, 0.35])
+    cb =fig.colorbar(imT, cax=cbar_ax)
+    cb.set_label(f'Conservative temperature\n anomaly ({r'$^{\circ}$'}C)')
+
+    cbar_ax = fig.add_axes([0.92, 0.12, 0.02, 0.35])
+    cb =fig.colorbar(imS, cax=cbar_ax)
+    cb.set_label('Absolute salinity\n anomaly (g kg$^{-1}$)')
+
+    return fig,axs
+
+##########################################################
 def plot_RT_mean_sections_from_mooring(ds_q_RT,ds_RT_loc):
     plt.rcParams.update({'font.size': 14})
 

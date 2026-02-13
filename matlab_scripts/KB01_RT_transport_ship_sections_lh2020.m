@@ -462,25 +462,25 @@ plot(T_WW.Qf)
 plot(T_WW.Qf_pro)
 legend('full WW','mean profile WB1/2')
 
-%% Check tides EW
-glider_path = 'C:\Users\sa07kb\OneDrive - SAMS\data\data_seaglider\2025_SE_Glider\';
-filename = 'glider_sections_gridded_20251129.nc';
-glider_file = [glider_path,filename];
-
-lon = ncread(glider_file, 'lon');
-lat = ncread(glider_file, 'lat');
-time  = ncread(glider_file, 't');
-t_n = length(time);
-x_n = length(lon);
-v_tide = NaN(x_n,t_n);
-
-for i=1:x_n;
-    v_tide(i,:) = tmd_tide_pred('Model_AO',time,lat(i),lon(i),'v');
-end
-who v_tide
-
-%%
-figure(22)
-[C,h]=contourf(lon,time,v_tide');
-caxis(cvellim); colormap(cmap); cb=colorbar;
-set(h, 'LineStyle', 'none');
+% %% Check tides EW
+% glider_path = 'C:\Users\sa07kb\OneDrive - SAMS\data\data_seaglider\2025_SE_Glider\';
+% filename = 'glider_sections_gridded_20251129.nc';
+% glider_file = [glider_path,filename];
+% 
+% lon = ncread(glider_file, 'lon');
+% lat = ncread(glider_file, 'lat');
+% time  = ncread(glider_file, 't');
+% t_n = length(time);
+% x_n = length(lon);
+% v_tide = NaN(x_n,t_n);
+% 
+% for i=1:x_n;
+%     v_tide(i,:) = tmd_tide_pred('Model_AO',time,lat(i),lon(i),'v');
+% end
+% who v_tide
+% 
+% %%
+% figure(22)
+% [C,h]=contourf(lon,time,v_tide');
+% caxis(cvellim); colormap(cmap); cb=colorbar;
+% set(h, 'LineStyle', 'none');

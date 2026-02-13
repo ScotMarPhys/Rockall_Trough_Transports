@@ -1,7 +1,7 @@
 # Rockall Trough Volume, Heat and Freshwater Transports
 This repository uses moored and glider observations from the Ellet Array to calculate volume, heat and freshwater transports through the northern Rockall Trough.
 
-The Rockall Trough moorings, located at approximately 57° north 11° west, form the eastern boundary of the international OSNAP (Overturning in the Subpolar North Atlantic Programme) array. This observing system has measured the full depth, basin-wide overturning circulation and associated transport of heat and freshwater since 2014. The Rockall Trough component is funded through the Atlantic Climate and Environment Strategic Science (AtlantiS) (NE/Y005589/1) and Climate Linked Atlantic Sector Science (CLASS) (NE/R015953/1), along with NERC grants U.K. OSNAP Decade (NE/T00858X/1 and NE/T008938/1). It consists of three vertical moorings in the boundaries of the subpolar basin, supplemented by glider missions to provide contemporaneous temperature and salinity information. Data included in this release were sampled between July 2014 and July 2022 and are from single point current meters and moored CTD instruments, providing measurements of water velocity, temperature, salinity, and pressure.
+The Rockall Trough moorings, located at approximately 57° north 11° west, form the eastern boundary of the international OSNAP (Overturning in the Subpolar North Atlantic Programme) array. This observing system has measured the full depth, basin-wide overturning circulation and associated transport of heat and freshwater since 2014. The Rockall Trough component is funded through the Atlantic Climate and Environment Strategic Science (AtlantiS) (NE/Y005589/1) and Climate Linked Atlantic Sector Science (CLASS) (NE/R015953/1), along with NERC grants U.K. OSNAP Decade (NE/T00858X/1 and NE/T008938/1). It consists of three vertical moorings in the boundaries of the subpolar basin, supplemented by glider missions to provide contemporaneous temperature and salinity information. Data included in this release were sampled between July 2014 and July 2024 and are from single point current meters and moored CTD instruments, providing measurements of water velocity, temperature, salinity, and pressure.
 
 # How to contribute
 ## As External
@@ -29,16 +29,27 @@ Generally, the notebooks are numbered to indicate the order they need to be run 
 First run notebooks/0.0_Rockall_Trough_moorings_data_prep_2014_2022_v0.ipynb to prepare the mooring data for the transport calculations. 
 
 ### Old methodology after Houpert et al. (2020) and Fraser et al. (2022)
-To calculate the Rockall Trough Transport wihtout using glider data run notebooks/1.0_Rockall_Trough_transports_2014_2022_v0.ipynb
+To calculate the Rockall Trough Transport wihtout using glider data run notebooks/1.0_Rockall_Trough_transports_2014_2024_v0.ipynb
 
 Note: To obtain Ekman transport estimate you will have to obatin monthly mean values of ERA5 horizontal wind stress. This function is not yet available in this repository. Alternatively, you can uncommand lines in the notebook regarding the Ekman transport, as it is neglectable (Houpert et al., 2020; Fraser et al., 2022)
 
 ### New methodology included Glider data after Burmeister et al. (in prep)
-To calculate the Rockall Trough Transport using glider data to obtain a better representation of the European Slope Current run notebooks/3.0_Rockall_Trough_transports_2014_2022_v1.ipynb
+To calculate the Rockall Trough Transport using glider data to obtain a better representation of the European Slope Current run notebooks/3.0_Rockall_Trough_transports_2014_2024_v1.ipynb
 
 Note: To obtain Ekman transport estimate you first will have to obatin monthly mean values of ERA5 horizontal wind stress. This function is not yet available in this repository. Alternatively, you can uncommand lines in the notebook regarding the Ekman transport, as it is neglectable (Houpert et al., 2020; Fraser et al., 2022)
 
 ### Glider spacial pattern analysis
-To perform an analysis of the dominant spatial pattern in the Glider sections use notebooks/2.0_Rockall_Trough_glider_EW_EOF_2020_2023.ipynb or 2.1_Rockall_Trough_glider_EW_HEOF_2020_2023.pdf. As the new methodology automatically performs an EOF analysis of the glider sections, it is not nessecary to run these if you are only interested in the transports.
+To perform an analysis of the dominant spatial pattern in the Glider sections use notebooks/2.0_Rockall_Trough_glider_EW_EOF_2020_2025.ipynb or 2.1_Rockall_Trough_glider_EW_HEOF_2020_2025.ipynb. As the new methodology automatically performs an EOF analysis of the glider sections, it is not nessecary to run these if you are only interested in the transports.
 
 The other notebooks are used to produce nice figures for paper and presentations and may include additional data products and analysis. They are dependent on data output of lower order notebooks.
+
+## Publications
+Burmeister, K., Fraser, N. J., Jones, S. C., Cunningham, S. A., Drysdale, L. A., Inall, M. E., Dotto, T. S., and Holliday, N. P.: Eight years of continuous Rockall Trough transport observations using moorings and gliders, EGUsphere [preprint], https://doi.org/10.5194/egusphere-2025-3167, 2025
+The following notebooks and matlab scripts produce most figures in Burmeister et al. (preprint):
+- notebooks/2.0_Rockall_Trough_glider_EW_EOF_2020_2025.ipynb
+- notebooks/9.0_Paper_Rokcall_Trough_Results.ipynb
+- matlab_scripts/KB01_RT_transport_ship_sections_lh2020.m
+
+Fraser, N. J., Cunningham, S. A., Drysdale, L. A., Inall, M. E., Johnson, C., Jones, S. C., Burmeister, K., Fox, A. D., Dumont, E., Porter, M., and Holliday, N. P.: North Atlantic Current and European Slope Current Circulation in the Rockall Trough Observed Using Moorings and Gliders, Journal of Geophysical Research: Oceans, 127, https://doi.org/10.1029/2022JC019291, 2022.
+
+Houpert, L., Cunningham, S., Fraser, N., Johnson, C., Holliday, N. P., Jones, S., Moat, B., and Rayner, D.: Observed Variability of the North Atlantic Current in the Rockall Trough From 4 Years of Mooring Measurements, Journal of Geophysical Research: Oceans, 125, 1–9, https://doi.org/10.1029/2020JC016403, 2020.
